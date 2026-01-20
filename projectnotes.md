@@ -26,32 +26,30 @@ The `MainActivity` features a vertically scrollable layout divided into several 
 2.  **Haptics Section**: Configuration for the vibration motor, including intensity and patterns.
 3.  **Alarm Settings**: Configuration for trigger-based alerts or wake-up functionality.
 4.  **Logging Settings**: Controls for the internal logger, including verbosity and storage.
-5.  **LLM Settings**: Configuration for the Large Language Model integration (API keys, model selection, prompt parameters).
+5.  **LLM Settings**: Configuration for the Large Language Model integration.
 
-## Components
+## Planned User-Facing Modes
 
-### MainActivity
-- **Role:** Main entry point and UI container.
-- **Configuration:** Locked to `sensorPortrait` in `AndroidManifest.xml`.
-- **UI Layout:** Uses `Scaffold` with a `TopAppBar` and a scrollable `Column`.
+- **Squeeze Heartbeat**: Uses acoustic squeeze detection (sub-audible frequencies via speaker/mic) to trigger a heartbeat haptic pulse.
+- **Sleep Assistance**: Rhythmic haptic patterns to aid sleep onset.
+- **Grounding Mode**: Rhythmic patterns for anxiety management.
+
+## Components & Technical Implementations
+
+### Squeeze Detection
+- **Mechanism**: Emitting a low-frequency (sub-audible) tone from the speaker and monitoring changes in the microphone input to detect pressure/squeeze on the device body.
 
 ### Detection.kt
-- Handles gyroscope and sensor data processing to detect PTSD-related symptoms (e.g., night terrors, restlessness).
+- Handles gyroscope and sensor data processing to detect PTSD-related symptoms.
 - Implements FFT analysis using `JTransforms`.
 
 ### Haptic.kt
-- Manages `VibratorManager` and `VibrationEffect` to provide tactile feedback.
-
-### Alarm.kt
-- Manages alarm scheduling and triggers based on detection events.
-
-### Logger.kt
-- Handles internal application logging for debugging and user history.
+- Manages `VibratorManager` and `VibrationEffect`.
 
 ### LLM_Manager.kt
-- Bridges to `LLMEdgeManager` from the `llmedge` library for local text generation and audio transcription.
+- Bridges to `LLMEdgeManager` for local text and audio processing.
 
 ## Development Guidelines
 - Follow Material 3 design principles.
 - Use `enableEdgeToEdge()` for modern Android UI.
-- All screen-specific logic should be decoupled from `MainActivity` where possible using Composable functions for each section.
+- All screen-specific logic should be decoupled from `MainActivity`.
