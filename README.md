@@ -1,32 +1,40 @@
 # The Haptic PTSD Project
 
-The Haptic PTSD Project is an Android application designed to assist individuals struggling with PTSD and sleep quality issues. By leveraging the physical capabilities of modern smartphones, the app provides non-invasive support through tactile feedback, local AI analysis, and motion sensing.
+The Haptic PTSD Project is an innovative Android application designed to provide immediate, non-invasive support for individuals managing PTSD and sleep-related distress. By combining tactile grounding techniques with advanced on-device sensing, the app offers a digital "anchor" during moments of anxiety or night terrors.
 
-## Purpose
+## Core Purpose
 
-The primary goal of this application is to improve sleep quality and provide relief from PTSD symptoms using:
-- **Haptic Feedback:** Utilizing the cellphone's vibration motor to provide grounding and calming sensations.
-- **Sensor-Based Detection:** Monitoring movement and orientation using the gyroscope to detect signs of restlessness or night terrors.
-- **Local AI Analysis:** Utilizing on-device Large Language Models (LLM) and Speech-to-Text (STT) for privacy-preserving analysis of sleep patterns and vocal triggers.
+The application aims to provide physiological regulation through:
+- **Immediate Grounding:** A "Squeeze-to-Soothe" mechanism that provides instant comfort when the user feels overwhelmed.
+- **Rhythmic Regulation:** High-fidelity haptic patterns, such as a simulated "heartbeat," designed to synchronize with the user's autonomic nervous system to lower heart rate and promote calm.
+- **Privacy-Centric Monitoring:** Continuous sensing of tremors and sleep disturbances using local, private AI analysis that never sends data to the cloud.
 
-## Features (Planned/Current)
+## Key Features
 
-- **Tremor Detection:** Real-time FFT analysis of sensor data to identify PTSD-related physical tremors.
-- **Vocal Trigger Response:** Local speech transcription to detect distress signals during sleep.
-- **Intelligent Grounding:** Adaptive haptic patterns triggered by detected episodes.
-- **Privacy First:** All AI processing happens locally on your device.
+### Squeeze-to-Soothe Heartbeat
+A primary therapeutic feature where the user simply squeezes their phone to activate a comforting, rhythmic "heartbeat" vibration. This mimics the calming effect of human touch or pulse-syncing, helping to break cycles of panic or distress.
+
+### Intelligent Sleep Assistance
+Specialized, rhythmic haptic sessions designed to assist in falling asleep and maintaining sleep quality. The app can be configured to detect signs of night terrors and respond with gentle tactile interventions.
+
+### Adaptive Calibration
+Because every user and every device is different, the app includes precision calibration tools to ensure detection sensitivity is perfectly tuned to the individual's needs and their specific phone hardware.
+
+### Privacy First
+Built for the most sensitive contexts, the app uses local AI (LLM and Speech-to-Text) to process triggers. No audio or sensor data leaves the device, ensuring total user confidentiality.
+
+## Information for Treatment Experts
+This project explores the intersection of **Haptic Grounding Therapy** and **Mobile Biosensing**. By providing a consistent, rhythmic tactile stimulus (the "heartbeat"), the app targets the "window of tolerance," aiming to assist users in returning from hyper-arousal to a regulated state without the need for external intervention.
+
+---
 
 ## Tech Stack
+- **UI:** Jetpack Compose (Material 3)
+- **Logic:** Kotlin / Coroutines
+- **Sensing:** Acoustic Pressure Detection (FFT-based)
+- **AI Engine:** LLMEdge (Local Llama & Whisper)
+- **Signal Processing:** JTransforms
 
-- **Language:** Kotlin
-- **UI Framework:** Jetpack Compose (Material 3)
-- **Local AI:** LLMEdge (Llama.cpp & Whisper.cpp wrappers)
-- **Signal Processing:** JTransforms (FFT)
-- **Hardware Integration:** Android Haptics and Sensor APIs
-
-## Getting Started
-
-1. Clone the repository.
-2. Open the project in Android Studio.
-3. **Requirement:** Ensure `app/libs/llmedge-release.aar` is present in the project.
-4. Build and run on an Android device (Android 11 / API 30 or higher).
+## Requirements
+- Android 11 (API 30) or higher.
+- Physical device required for haptic and sensor functionality.

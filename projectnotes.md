@@ -7,49 +7,39 @@ This document contains technical details, architectural decisions, and developme
 - **Minimum SDK:** 30 (Required by `llmedge` library).
 - **Target SDK:** 36.
 - **UI Framework:** Jetpack Compose with Material 3.
-- **Language:** Kotlin.
+- **Language:** Kotlin / Coroutines.
 - **Navigation:** Single-activity architecture (`MainActivity`).
 
-## Key Dependencies
+## Core Hardware Integration
 
-- **LLM & STT (Local AI):** `llmedge-release.aar` (Local AAR)
-    - Provides native JNI wrappers for llama.cpp (GGUF inference) and whisper.cpp (STT).
-    - Requires `androidx.documentfile` and `com.google.code.gson`.
-- **Signal Processing:** `com.github.wendykierp:JTransforms`
-    - Used for FFT analysis of sensor data to detect specific tremor frequencies (4Hz–12Hz).
+### Acoustic Squeeze Detection (`SqueezeDetector.kt`)
+- **Mechanism**: On-device sonar. Emits a 20kHz (inaudible) sine wave via `AudioTrack` and monitors the environment via `AudioRecord`.
+- **Logic**: Physical pressure on the device disrupts the acoustic path between speaker and microphone.
+- **Processing**: Real-time FFT analysis using `JTransforms`. 
+- **Calibration**: Dynamic baseline calculation + user-adjustable sensitivity threshold (1% - 99%).
+- **Shutdown Sequence**: Atomic state management and explicit `stop()` calls to native hardware *before* resource release to prevent `SIGABRT` race conditions.
 
-## Main Screen Sections
+### Haptic Feedback Engine (`HapticManager.kt`)
+- **Core Pattern**: "Lub-dub" heartbeat simulation.
+- **Session Management**: Timer-based sessions (default 2 mins) with auto-stop and extension logic.
+- **Parameters**: Real-time adjustment of intensity (0-100%) and frequency (30-200 BPM).
+- **Concurrency**: Managed via Coroutines on `Dispatchers.Default` to ensure UI smoothness during continuous vibration patterns.
 
-The `MainActivity` features a vertically scrollable layout divided into several functional modules:
+## Software Architecture
 
-1.  **Detection Section**: Controls and status for motion/gyroscope sensing logic.
-2.  **Haptics Section**: Configuration for the vibration motor, including intensity and patterns.
-3.  **Alarm Settings**: Configuration for trigger-based alerts or wake-up functionality.
-4.  **Logging Settings**: Controls for the internal logger, including verbosity and storage.
-5.  **LLM Settings**: Configuration for the Large Language Model integration.
+### Logging System (`Logger.kt`)
+- **Levels**: `DEBUG`, `INFO`, `ERROR`.
+- **State**: Exposed via `StateFlow<List<LogEntry>>`.
+- **UI Features**: Reverse chronological sorting, level filtering (Ordinal-based), and visual color coding.
 
-## Planned User-Facing Modes
+### Mode Management (`UserFacingModes.kt`)
+- **Type**: Multi-selection Set-based state.
+- **Implementation**: `Sealed Class` for mode definitions, allowing for rich metadata (icons, descriptions) alongside logical IDs.
 
-- **Squeeze Heartbeat**: Uses acoustic squeeze detection (sub-audible frequencies via speaker/mic) to trigger a heartbeat haptic pulse.
-- **Sleep Assistance**: Rhythmic haptic patterns to aid sleep onset.
-- **Grounding Mode**: Rhythmic patterns for anxiety management.
+## Native & AI Dependencies
+- **llmedge-release.aar**: Local AAR providing JNI bridges for Llama (GGUF) and Whisper (STT).
+- **JTransforms**: Java-based FFT library for signal processing.
 
-## Components & Technical Implementations
-
-### Squeeze Detection
-- **Mechanism**: Emitting a low-frequency (sub-audible) tone from the speaker and monitoring changes in the microphone input to detect pressure/squeeze on the device body.
-
-### Detection.kt
-- Handles gyroscope and sensor data processing to detect PTSD-related symptoms.
-- Implements FFT analysis using `JTransforms`.
-
-### Haptic.kt
-- Manages `VibratorManager` and `VibrationEffect`.
-
-### LLM_Manager.kt
-- Bridges to `LLMEdgeManager` for local text and audio processing.
-
-## Development Guidelines
-- Follow Material 3 design principles.
-- Use `enableEdgeToEdge()` for modern Android UI.
-- All screen-specific logic should be decoupled from `MainActivity`.
+## Current Known Issues / Notes
+- **AppOps Warning**: `attributionTag` warning in logcat is a non-breaking system notice regarding microphone usage.
+- **Native Stability**: Audio hardware must be stopped and joined before releasing to avoid system-level crashes.
