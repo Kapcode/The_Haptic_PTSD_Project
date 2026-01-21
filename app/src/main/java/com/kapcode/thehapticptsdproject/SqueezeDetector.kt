@@ -21,15 +21,19 @@ import kotlin.math.sqrt
 data class SqueezeDetectorState(
     val liveMagnitude: Double = 0.0,
     val baselineMagnitude: Double = 0.0,
-    val squeezeThresholdPercent: Double = 0.50 // 50%
+    val squeezeThresholdPercent: Double = 0.50, // 50%
+    val isCalibrating: Boolean = false
 )
 
+//TODO add a "Calibrating..." indicator to the UI card so the user knows to hold still?
 class SqueezeDetector(
     private val onSqueezeDetected: () -> Unit
 ) {
     private var isRunning = AtomicBoolean(false)
-    private lateinit var audioRecord: AudioRecord
-    private lateinit var audioTrack: AudioTrack
+    private var shouldRecalibrate = AtomicBoolean(false)
+    
+    private var audioRecord: AudioRecord? = null
+    private var audioTrack: AudioTrack? = null
     private var processingJob: Job? = null
     private var toneJob: Job? = null
 
@@ -37,7 +41,7 @@ class SqueezeDetector(
     val state = _state.asStateFlow()
 
     private val sampleRate = 44100
-    private val frequency = 20000.0 // 20kHz
+    private val frequency = 20000.0 // 20kHz sonar tone
     private val bufferSize = AudioRecord.getMinBufferSize(
         sampleRate,
         AudioFormat.CHANNEL_IN_MONO,
@@ -51,62 +55,66 @@ class SqueezeDetector(
 
     fun setSqueezeThreshold(percent: Double) {
         _state.value = _state.value.copy(squeezeThresholdPercent = percent)
-        Logger.info("Squeeze threshold updated to ${percent * 100}%")
+        Logger.info("Squeeze threshold updated to ${String.format("%.0f", percent * 100)}%")
     }
 
     fun recalibrate() {
         if (isRunning.get()) {
-            startProcessingLoop(forceRecalibrate = true)
+            if (shouldRecalibrate.compareAndSet(false, true)) {
+                Logger.info("Recalibration requested...")
+            }
         }
     }
 
     @SuppressLint("MissingPermission")
     fun start() {
         if (isRunning.getAndSet(true)) return
-        Logger.info("SqueezeDetector starting...")
+        Logger.info("SqueezeDetector starting sonar...")
 
         try {
             setupAudio()
-            audioRecord.startRecording()
-            audioTrack.play()
-            Logger.info("Audio hardware started.")
+            audioRecord?.startRecording()
+            audioTrack?.play()
+            
             startToneGeneration()
-            startProcessingLoop(forceRecalibrate = true)
+            startProcessingLoop()
+            
+            // Trigger initial calibration
+            shouldRecalibrate.set(true)
         } catch (e: Exception) {
             Logger.error("ERROR starting detector: ${e.message}")
-            isRunning.set(false)
+            stop()
         }
     }
 
     fun stop() {
         if (!isRunning.getAndSet(false)) return
-        Logger.info("Stopping SqueezeDetector...")
+        Logger.info("Stopping SqueezeDetector hardware...")
 
-        // Stop the hardware first to unblock any read/write calls
+        // 1. Unblock native calls by stopping hardware
         try {
-            audioRecord.stop()
-            audioTrack.stop()
+            audioRecord?.stop()
+            audioTrack?.stop()
         } catch (e: Exception) {
-            Logger.error("ERROR stopping audio hardware: ${e.message}")
+            // Ignore errors during stop
         }
 
-        // Now, wait for the coroutines to finish cleanly
+        // 2. Wait for background loops to exit
         runBlocking {
-            try {
-                processingJob?.join()
-                toneJob?.join()
-            } catch (e: Exception) {
-                Logger.error("Error joining jobs: ${e.message}")
-            }
+            processingJob?.cancelAndJoin()
+            toneJob?.cancelAndJoin()
         }
 
-        // Finally, release the resources
+        // 3. Clean up resources
         try {
-            audioRecord.release()
-            audioTrack.release()
-            Logger.info("SqueezeDetector stopped successfully.")
+            audioRecord?.release()
+            audioTrack?.release()
+            audioRecord = null
+            audioTrack = null
+            _state.value = _state.value.copy(liveMagnitude = 0.0, baselineMagnitude = 0.0, isCalibrating = false)
+            Logger.info("SqueezeDetector fully stopped.")
         } catch (e: Exception) {
-            Logger.error("ERROR releasing detector hardware: ${e.message}")
+            Logger.error("ERROR releasing audio: ${e.message}")
         }
     }
 
@@ -124,93 +132,125 @@ class SqueezeDetector(
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
 
-        audioRecord = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize)
+        audioRecord = AudioRecord(
+            MediaRecorder.AudioSource.MIC,
+            sampleRate,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+            bufferSize
+        )
     }
 
     private fun startToneGeneration() {
         toneJob = CoroutineScope(Dispatchers.IO).launch {
+            val buffer = ShortArray(bufferSize)
+            var angle = 0.0
             try {
-                val buffer = ShortArray(bufferSize)
-                var angle = 0.0
                 while (isRunning.get()) {
                     for (i in buffer.indices) {
                         val sinValue = Math.sin(angle)
                         buffer[i] = (sinValue * Short.MAX_VALUE).toInt().toShort()
                         angle += 2 * Math.PI * frequency / sampleRate
                     }
-                    audioTrack.write(buffer, 0, buffer.size)
+                    val track = audioTrack ?: break
+                    if (isRunning.get()) {
+                        track.write(buffer, 0, buffer.size)
+                    }
                 }
             } catch (e: Exception) {
                 if (e !is kotlinx.coroutines.CancellationException) {
-                    Logger.error("ERROR in tone generation: ${e.message}")
+                    Logger.error("Sonar tone error: ${e.message}")
                 }
             }
         }
     }
 
-    private fun startProcessingLoop(forceRecalibrate: Boolean = false) {
+    private fun startProcessingLoop() {
         processingJob = CoroutineScope(Dispatchers.IO).launch {
+            val audioData = ShortArray(bufferSize)
+            val fft = DoubleFFT_1D(bufferSize.toLong())
+            val targetBin = (frequency * bufferSize / sampleRate).toInt()
+
             try {
-                val audioData = ShortArray(bufferSize)
-                val fft = DoubleFFT_1D(bufferSize.toLong())
-                val targetBin = (frequency * bufferSize / sampleRate).toInt()
-
-                if (forceRecalibrate) {
-                    Logger.info("Calibrating...")
-                    val calibrationReadings = mutableListOf<Double>()
-                    val calibrationEndTime = System.currentTimeMillis() + CALIBRATION_DURATION_MS
-                    while (isRunning.get() && System.currentTimeMillis() < calibrationEndTime) {
-                        val readSize = audioRecord.read(audioData, 0, bufferSize)
-                        if (readSize > 0) {
-                            val magnitude = getMagnitudeAtBin(fft, audioData, targetBin)
-                            _state.value = _state.value.copy(liveMagnitude = magnitude)
-                            calibrationReadings.add(magnitude)
-                        }
-                    }
-                    val newBaseline = if (calibrationReadings.isNotEmpty()) calibrationReadings.average() else 0.0
-                    _state.value = _state.value.copy(baselineMagnitude = newBaseline)
-
-                    if (newBaseline > 0) {
-                        Logger.info("Calibration complete. Baseline: $newBaseline")
-                    } else {
-                        Logger.error("Calibration FAILED: No audio readings.")
-                        stop()
-                        return@launch
-                    }
-                }
-
-                // Detection phase
                 while (isRunning.get()) {
-                    val readSize = audioRecord.read(audioData, 0, bufferSize)
-                    if (readSize > 0) {
+                    // Check if we need to recalibrate
+                    if (shouldRecalibrate.get()) {
+                        performCalibration(fft, audioData, targetBin)
+                        shouldRecalibrate.set(false)
+                    }
+
+                    val record = audioRecord ?: break
+                    val readSize = record.read(audioData, 0, bufferSize)
+                    
+                    if (readSize > 0 && isRunning.get()) {
                         val currentMagnitude = getMagnitudeAtBin(fft, audioData, targetBin)
                         _state.value = _state.value.copy(liveMagnitude = currentMagnitude)
 
                         val baseline = _state.value.baselineMagnitude
                         val threshold = _state.value.squeezeThresholdPercent
+                        
                         if (baseline > 0 && currentMagnitude < (baseline * threshold)) {
                             onSqueezeDetected()
                             delay(TRIGGER_DELAY_MS)
                         }
-                    } else {
-                        // readSize is <= 0, which means the track has been stopped.
-                        // Break the loop to allow the job to finish.
-                        break
+                    } else if (readSize <= 0) {
+                        break // Hardware stopped or error
                     }
                 }
             } catch (e: Exception) {
                 if (e !is kotlinx.coroutines.CancellationException) {
-                    Logger.error("ERROR in processing loop: ${e.message}")
+                    Logger.error("Detection loop error: ${e.message}")
                 }
+            } finally {
+                _state.value = _state.value.copy(isCalibrating = false)
             }
         }
     }
 
+    private suspend fun performCalibration(fft: DoubleFFT_1D, audioData: ShortArray, targetBin: Int) {
+        Logger.info("Starting calibration baseline measurement...")
+        _state.value = _state.value.copy(isCalibrating = true)
+        
+        val readings = mutableListOf<Double>()
+        val endTime = System.currentTimeMillis() + CALIBRATION_DURATION_MS
+        
+        while (System.currentTimeMillis() < endTime && isRunning.get()) {
+            val record = audioRecord ?: break
+            val readSize = record.read(audioData, 0, bufferSize)
+            if (readSize > 0) {
+                val mag = getMagnitudeAtBin(fft, audioData, targetBin)
+                readings.add(mag)
+                _state.value = _state.value.copy(liveMagnitude = mag)
+            }
+        }
+        
+        if (readings.isNotEmpty()) {
+            val avg = readings.average()
+            _state.value = _state.value.copy(baselineMagnitude = avg, isCalibrating = false)
+            Logger.info("Calibration complete. New baseline: ${avg.toInt()}")
+        } else {
+            Logger.error("Calibration failed: No signal detected.")
+            _state.value = _state.value.copy(isCalibrating = false)
+        }
+    }
+
     private fun getMagnitudeAtBin(fft: DoubleFFT_1D, audioData: ShortArray, bin: Int): Double {
-        val doubleData = audioData.map { it.toDouble() }.toDoubleArray()
+        val doubleData = DoubleArray(audioData.size)
+        for (i in audioData.indices) {
+            doubleData[i] = audioData[i].toDouble()
+        }
         fft.realForward(doubleData)
-        val real = doubleData[2 * bin]
-        val imag = doubleData[2 * bin + 1]
+        
+        // JTransforms realForward layout for N even: [Re(0), Re(N/2), Re(1), Im(1), ...]
+        val real: Double
+        val imag: Double
+        if (bin == 0) {
+            real = doubleData[0]
+            imag = 0.0
+        } else {
+            real = doubleData[2 * bin]
+            imag = doubleData[2 * bin + 1]
+        }
         return sqrt(real * real + imag * imag)
     }
 }

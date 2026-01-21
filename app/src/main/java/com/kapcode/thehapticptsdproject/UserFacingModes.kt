@@ -12,10 +12,10 @@ sealed class PTSDMode(
     val description: String,
     val icon: ImageVector
 ) {
-    object SqueezeHeartbeat : PTSDMode(
-        id = "SQUEEZE_HEARTBEAT",
-        name = "Squeeze Heartbeat",
-        description = "Squeeze your phone to feel a comforting heartbeat sensation.",
+    object ActiveHeartbeat : PTSDMode(
+        id = "ACTIVE_HEARTBEAT",
+        name = "Active Heartbeat",
+        description = "Trigger on squeeze or shake, a heartbeat pulsing lasting X seconds to help soothe.",
         icon = Icons.Default.Favorite
     )
 
