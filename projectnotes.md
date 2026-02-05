@@ -4,7 +4,7 @@ This document contains technical details, architectural decisions, and developme
 
 ## Project Structure & Architecture
 
-- **Minimum SDK:** 30 (Required by `llmedge` library).
+- **Minimum SDK:** 24.
 - **Target SDK:** 36.
 - **UI Framework:** Jetpack Compose with Material 3.
 - **Language:** Kotlin / Coroutines.
@@ -46,8 +46,7 @@ This document contains technical details, architectural decisions, and developme
 - **Scope**: All hardware preferences (Intensity, BPM, Thresholds, Toggles) are persisted.
 - **Exclusion**: Therapeutic Modes (Active Heartbeat, etc.) are NOT persisted for safety.
 
-## Native & AI Dependencies
-- **llmedge-release.aar**: Local AAR providing JNI bridges for Llama (GGUF) and Whisper (STT).
+## Signal Processing Dependencies
 - **JTransforms**: Java-based FFT library for signal processing.
 
 ## Current Known Issues / Notes

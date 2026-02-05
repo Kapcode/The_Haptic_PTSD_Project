@@ -19,10 +19,10 @@ A primary therapeutic feature where the user activates a comforting, rhythmic "h
 Specialized, rhythmic haptic sessions designed to assist in falling asleep and maintaining sleep quality. The app is evolving to detect signs of tremors or night terrors and respond with gentle tactile interventions.
 
 ### Persistent Customization & Calibration
-The app includes precision calibration tools for both acoustic squeeze detection and motion sensitivity. All your preferences—intensity, BPM, and detection thresholds—are automatically saved and remembered.
+The app includes precision calibration tools for both acoustic pressure detection and motion sensitivity. All your preferences—intensity, BPM, and detection thresholds—are automatically saved and remembered.
 
 ### Privacy First
-Built for the most sensitive contexts, the app uses local AI (LLM and Speech-to-Text) to process triggers. No audio or sensor data leaves the device, ensuring total user confidentiality.
+Built for the most sensitive contexts, all detection and analysis happen locally on the device. No audio or sensor data is recorded permanently or sent to external servers, ensuring total user confidentiality.
 
 ## Information for Treatment Experts
 This project explores the intersection of **Haptic Grounding Therapy** and **Mobile Biosensing**. By providing a consistent, rhythmic tactile stimulus (the "heartbeat"), the app targets the "window of tolerance," aiming to assist users in returning from hyper-arousal to a regulated state without the need for external intervention.
@@ -34,16 +34,11 @@ This project explores the intersection of **Haptic Grounding Therapy** and **Mob
 - **Logic:** Kotlin / Coroutines
 - **Sensing:** Acoustic Pressure Detection (sonar-based) & Linear Acceleration (gravity-independent motion)
 - **Background:** Android Foreground Service with WakeLock
-- **AI Engine:** LLMEdge (Local Llama & Whisper)
 - **Signal Processing:** JTransforms
 
 ## Requirements
 - Android 11 (API 30) or higher.
 - Physical device required for haptic and sensor functionality.
 
-
-
-IDEAS- for modes
-use beat detection, possibly mdi files, max amplitude stereo left and right for Bilateral Stimulation. (2 phones needed (BT))
-
-2 phones connected ideal for Bilateral Stimulation, one on each arm. connected with BT
+## Future Exploration
+- Bilateral Stimulation: Support for dual-device connectivity via Bluetooth to provide alternating pulses on each arm.
