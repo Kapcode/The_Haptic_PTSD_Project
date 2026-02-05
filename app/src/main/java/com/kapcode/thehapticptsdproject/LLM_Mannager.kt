@@ -1,4 +1,3 @@
 package com.kapcode.thehapticptsdproject
 
-class LLM_Mannager {
-}
+// File to be deleted or emptied

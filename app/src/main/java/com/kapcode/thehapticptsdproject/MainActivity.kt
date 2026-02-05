@@ -35,8 +35,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
-    //TODO Start with voice detection
-    //TODO Remove all refrencess to LLM and llm
+
     private lateinit var hapticManager: HapticManager
     private lateinit var squeezeDetector: SqueezeDetector
 
@@ -220,9 +219,6 @@ fun MainScreen(
             Spacer(modifier = Modifier.height(16.dp))
             LoggerCard()
             Spacer(modifier = Modifier.height(16.dp))
-            SectionCard(title = "LLM Settings") {
-                Text("AI model configuration and API keys.")
-            }
         }
     }
 }
@@ -314,7 +310,7 @@ fun HapticControlCard(hapticManager: HapticManager) {
                         )
                     }
                     LinearProgressIndicator(
-                        progress = if (state.isTestRunning) state.testPulseCount.toFloat() / 3f else state.remainingSeconds.toFloat() / state.sessionDurationSeconds.toFloat(),
+                        progress = { if (state.isTestRunning) state.testPulseCount.toFloat() / 3f else state.remainingSeconds.toFloat() / state.sessionDurationSeconds.toFloat() },
                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
                     )
                 }
