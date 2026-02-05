@@ -14,12 +14,10 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
-import kotlinx.coroutines.*
 import kotlin.math.sqrt
 
 class HapticService : Service(), SensorEventListener {
 
-    private lateinit var hapticManager: HapticManager
     private lateinit var squeezeDetector: SqueezeDetector
     private lateinit var sensorManager: SensorManager
     private var motionSensor: Sensor? = null
@@ -43,13 +41,15 @@ class HapticService : Service(), SensorEventListener {
 
     override fun onCreate() {
         super.onCreate()
-        hapticManager = HapticManager(this)
+        
+        // Initialize singleton HapticManager
+        HapticManager.init(this)
         
         // Load persisted settings for haptics
         SettingsManager.init(this)
-        hapticManager.updateIntensity(SettingsManager.intensity)
-        hapticManager.updateBpm(SettingsManager.bpm)
-        hapticManager.updateSessionDuration(SettingsManager.sessionDurationSeconds)
+        HapticManager.updateIntensity(SettingsManager.intensity)
+        HapticManager.updateBpm(SettingsManager.bpm)
+        HapticManager.updateSessionDuration(SettingsManager.sessionDurationSeconds)
 
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
@@ -84,18 +84,22 @@ class HapticService : Service(), SensorEventListener {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Active Heartbeat Running")
             .setContentText("Monitoring for squeeze and wrist snaps...")
-            .setSmallIcon(R.mipmap.ic_launcher) // Ensure you have an icon
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
-        startForeground(NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun acquireWakeLock() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "HapticProject::DetectionWakeLock")
-        wakeLock?.acquire(10 * 60 * 1000L /*10 minutes max default, though START_STICKY helps*/)
+        wakeLock?.acquire(10 * 60 * 1000L)
     }
 
     private fun startDetection() {
@@ -114,7 +118,7 @@ class HapticService : Service(), SensorEventListener {
 
     private fun triggerHeartbeat(source: String) {
         Logger.info("$source detected in background! Starting soothing session.")
-        hapticManager.startHeartbeatSession()
+        HapticManager.startHeartbeatSession()
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
@@ -148,7 +152,7 @@ class HapticService : Service(), SensorEventListener {
         super.onDestroy()
         squeezeDetector.stop()
         sensorManager.unregisterListener(this)
-        hapticManager.stopHeartbeatSession()
+        HapticManager.stopHeartbeatSession()
         wakeLock?.let {
             if (it.isHeld) it.release()
         }

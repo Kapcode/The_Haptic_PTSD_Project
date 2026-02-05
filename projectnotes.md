@@ -8,38 +8,48 @@ This document contains technical details, architectural decisions, and developme
 - **Target SDK:** 36.
 - **UI Framework:** Jetpack Compose with Material 3.
 - **Language:** Kotlin / Coroutines.
-- **Navigation:** Single-activity architecture (`MainActivity`).
+- **Background Logic:** Android Foreground Service (`HapticService.kt`) with `PARTIAL_WAKE_LOCK`.
+- **Persistence:** `SharedPreferences` managed via `SettingsManager.kt`.
 
 ## Core Hardware Integration
 
 ### Acoustic Squeeze Detection (`SqueezeDetector.kt`)
 - **Mechanism**: On-device sonar. Emits a 20kHz (inaudible) sine wave via `AudioTrack` and monitors the environment via `AudioRecord`.
-- **Logic**: Physical pressure on the device disrupts the acoustic path between speaker and microphone.
-- **Processing**: Real-time FFT analysis using `JTransforms`. 
-- **Calibration**: Dynamic baseline calculation + user-adjustable sensitivity threshold (1% - 99%).
-- **Shutdown Sequence**: Atomic state management and explicit `stop()` calls to native hardware *before* resource release to prevent `SIGABRT` race conditions.
+- **Processing**: Real-time FFT analysis using `JTransforms`.
+- **Concurrency**: `AtomicBoolean` for running state and `AtomicBoolean` for signaling recalibration to avoid race conditions.
+- **Calibration**: Dynamic baseline calculation + user-adjustable sensitivity threshold (5% - 95% with 5% steps).
+- **Safe Shutdown**: Hardware `stop()` calls precede coroutine `cancelAndJoin()` to prevent `SIGABRT` native crashes.
+
+### Motion Detection (`MainActivity.kt` & `HapticService.kt`)
+- **Sensor**: `Sensor.TYPE_LINEAR_ACCELERATION`.
+- **Tuning**: Optimized for sudden "wrist snaps" or "flaps" by stripping out gravity components.
+- **Sensitivity**: User-adjustable mapping where internal thresholds range from high (gentle) to low (deliberate).
 
 ### Haptic Feedback Engine (`HapticManager.kt`)
-- **Core Pattern**: "Lub-dub" heartbeat simulation.
-- **Session Management**: Timer-based sessions (default 2 mins) with auto-stop and extension logic.
-- **Parameters**: Real-time adjustment of intensity (0-100%) and frequency (30-200 BPM).
-- **Concurrency**: Managed via Coroutines on `Dispatchers.Default` to ensure UI smoothness during continuous vibration patterns.
+- **Pattern**: "Lub-dub" heartbeat simulation.
+- **Architecture**: Singleton `object` to ensure unified state between the UI and Background Service.
+- **Session Management**: Timer-based sessions with auto-stop and "reset-on-trigger" extension logic.
+- **Testing**: `testPulseSequence()` provides a 3-beat burst to allow immediate tuning of BPM and intensity.
 
 ## Software Architecture
 
 ### Logging System (`Logger.kt`)
 - **Levels**: `DEBUG`, `INFO`, `ERROR`.
-- **State**: Exposed via `StateFlow<List<LogEntry>>`.
-- **UI Features**: Reverse chronological sorting, level filtering (Ordinal-based), and visual color coding.
+- **Persistence**: Currently session-based (in-memory list).
+- **UI Features**: Ordinal-based level filtering and reverse chronological sorting.
 
 ### Mode Management (`UserFacingModes.kt`)
-- **Type**: Multi-selection Set-based state.
-- **Implementation**: `Sealed Class` for mode definitions, allowing for rich metadata (icons, descriptions) alongside logical IDs.
+- **Selection**: Set-based multi-selection.
+- **Lifecycle**: Modes are reset to empty on fresh launch to ensure intentional activation of physiological interventions.
+
+## Persistence (`SettingsManager.kt`)
+- **Scope**: All hardware preferences (Intensity, BPM, Thresholds, Toggles) are persisted.
+- **Exclusion**: Therapeutic Modes (Active Heartbeat, etc.) are NOT persisted for safety.
 
 ## Native & AI Dependencies
 - **llmedge-release.aar**: Local AAR providing JNI bridges for Llama (GGUF) and Whisper (STT).
 - **JTransforms**: Java-based FFT library for signal processing.
 
 ## Current Known Issues / Notes
-- **AppOps Warning**: `attributionTag` warning in logcat is a non-breaking system notice regarding microphone usage.
-- **Native Stability**: Audio hardware must be stopped and joined before releasing to avoid system-level crashes.
+- **Foreground Service**: Requires `FOREGROUND_SERVICE_MICROPHONE` and `FOREGROUND_SERVICE_SPECIAL_USE` permissions on API 34+.
+- **WakeLock**: Used to ensure sensor processing continues when the screen is dimmed or off during sleep monitoring.
