@@ -40,3 +40,10 @@ This project explores the intersection of **Haptic Grounding Therapy** and **Mob
 ## Requirements
 - Android 11 (API 30) or higher.
 - Physical device required for haptic and sensor functionality.
+
+
+
+IDEAS- for modes
+use beat detection, possibly mdi files, max amplitude stereo left and right for Bilateral Stimulation. (2 phones needed (BT))
+
+2 phones connected ideal for Bilateral Stimulation, one on each arm. connected with BT
