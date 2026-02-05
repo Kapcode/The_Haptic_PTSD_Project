@@ -51,12 +51,25 @@ object HapticManager {
     }
 
     fun updateSessionDuration(seconds: Int) {
-        _state.value = _state.value.copy(sessionDurationSeconds = seconds.coerceIn(10, 600))
+        val current = _state.value
+        val newDuration = seconds.coerceIn(10, 600)
+        if (current.isHeartbeatRunning) {
+            // Update remaining time live if session is active
+            _state.value = current.copy(
+                sessionDurationSeconds = newDuration,
+                remainingSeconds = newDuration
+            )
+            Logger.debug("Session timer updated live to ${newDuration}s")
+        } else {
+            _state.value = current.copy(sessionDurationSeconds = newDuration)
+        }
     }
 
     fun startHeartbeatSession() {
         if (_state.value.isHeartbeatRunning) {
+            // Reset/extend timer to current full duration
             _state.value = _state.value.copy(remainingSeconds = _state.value.sessionDurationSeconds)
+            Logger.info("Heartbeat session extended.")
             return
         }
 
@@ -68,17 +81,25 @@ object HapticManager {
 
         sessionJob?.cancel()
         sessionJob = CoroutineScope(Dispatchers.Default).launch {
+            Logger.info("Soothing heartbeat session started for ${_state.value.sessionDurationSeconds}s.")
+            
+            // Pulse loop
             val pulseJob = launch {
                 while (_state.value.isHeartbeatRunning) {
                     playHeartbeatPulse()
+                    // Re-read BPM in case it changed live
                     val interval = 60000L / _state.value.bpm
                     delay(interval)
                 }
             }
 
+            // Countdown loop
             while (_state.value.remainingSeconds > 0 && _state.value.isHeartbeatRunning) {
                 delay(1000)
-                _state.value = _state.value.copy(remainingSeconds = _state.value.remainingSeconds - 1)
+                // Use decrement to be safe with live updates
+                if (_state.value.remainingSeconds > 0) {
+                    _state.value = _state.value.copy(remainingSeconds = _state.value.remainingSeconds - 1)
+                }
             }
 
             stopHeartbeatSession()
@@ -86,9 +107,11 @@ object HapticManager {
     }
 
     fun stopHeartbeatSession() {
+        if (!_state.value.isHeartbeatRunning) return
         _state.value = _state.value.copy(isHeartbeatRunning = false, remainingSeconds = 0)
         sessionJob?.cancel()
         vibrator?.cancel()
+        Logger.info("Heartbeat session finished.")
     }
 
     fun testPulseSequence() {
