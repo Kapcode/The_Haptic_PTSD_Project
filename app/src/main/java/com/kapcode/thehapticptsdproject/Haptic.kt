@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -16,7 +17,7 @@ import kotlinx.coroutines.launch
 data class HapticState(
     val intensity: Float = 0.5f,
     val bpm: Int = 60,
-    val sessionDurationSeconds: Int = 120,
+    val sessionDurationSeconds: Int = 120, // 2 minutes default
     val isHeartbeatRunning: Boolean = false,
     val remainingSeconds: Int = 0,
     val isTestRunning: Boolean = false,
@@ -54,7 +55,6 @@ object HapticManager {
         val current = _state.value
         val newDuration = seconds.coerceIn(10, 600)
         if (current.isHeartbeatRunning) {
-            // Update remaining time live if session is active
             _state.value = current.copy(
                 sessionDurationSeconds = newDuration,
                 remainingSeconds = newDuration
@@ -65,9 +65,9 @@ object HapticManager {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     fun startHeartbeatSession() {
         if (_state.value.isHeartbeatRunning) {
-            // Reset/extend timer to current full duration
             _state.value = _state.value.copy(remainingSeconds = _state.value.sessionDurationSeconds)
             Logger.info("Heartbeat session extended.")
             return
@@ -83,20 +83,16 @@ object HapticManager {
         sessionJob = CoroutineScope(Dispatchers.Default).launch {
             Logger.info("Soothing heartbeat session started for ${_state.value.sessionDurationSeconds}s.")
             
-            // Pulse loop
             val pulseJob = launch {
                 while (_state.value.isHeartbeatRunning) {
                     playHeartbeatPulse()
-                    // Re-read BPM in case it changed live
                     val interval = 60000L / _state.value.bpm
                     delay(interval)
                 }
             }
 
-            // Countdown loop
             while (_state.value.remainingSeconds > 0 && _state.value.isHeartbeatRunning) {
                 delay(1000)
-                // Use decrement to be safe with live updates
                 if (_state.value.remainingSeconds > 0) {
                     _state.value = _state.value.copy(remainingSeconds = _state.value.remainingSeconds - 1)
                 }
@@ -114,6 +110,7 @@ object HapticManager {
         Logger.info("Heartbeat session finished.")
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     fun testPulseSequence() {
         if (_state.value.isTestRunning || _state.value.isHeartbeatRunning) return
         
@@ -130,17 +127,32 @@ object HapticManager {
         }
     }
 
+    /**
+     * Plays a generic single pulse. Useful for beat-synchronized playback
+     * where the "lub-dub" heartbeat pattern might not be appropriate.
+     */
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun playPulse(intensityOverride: Float? = null, durationMs: Long = 100L) {
+        val intensity = intensityOverride ?: _state.value.intensity
+        val strength = (255 * intensity).toInt().coerceIn(1, 255)
+        
+        vibrator?.vibrate(VibrationEffect.createOneShot(durationMs, strength))
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
     fun playSingleHeartbeat() {
         CoroutineScope(Dispatchers.Default).launch {
             playHeartbeatPulse()
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun playHeartbeatPulse() {
         val intensity = _state.value.intensity
         val strength1 = (255 * intensity).toInt().coerceIn(1, 255)
         val strength2 = (180 * intensity).toInt().coerceIn(1, 255)
 
+        // Lub-dub pattern
         vibrator?.vibrate(VibrationEffect.createOneShot(50, strength1))
         delay(150)
         vibrator?.vibrate(VibrationEffect.createOneShot(60, strength2))

@@ -10,31 +10,34 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.net.Uri
 import android.os.Bundle
+import android.provider.DocumentsContract
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.kapcode.thehapticptsdproject.ui.theme.TheHapticPTSDProjectTheme
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -42,6 +45,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var hapticManager: HapticManager
     private lateinit var squeezeDetector: SqueezeDetector
+    private lateinit var beatDetector: BeatDetector
 
     // State for switches and sensitivity (initialized from SettingsManager)
     private var isSqueezeEnabled by mutableStateOf(false)
@@ -62,6 +66,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         SettingsManager.init(this)
         HapticManager.init(this)
+        beatDetector = BeatDetector(this)
         
         isSqueezeEnabled = SettingsManager.isSqueezeEnabled
         isShakeEnabled = SettingsManager.isShakeEnabled
@@ -83,6 +88,7 @@ class MainActivity : ComponentActivity() {
                 MainScreen(
                     squeezeDetector = squeezeDetector,
                     hapticManager = hapticManager,
+                    beatDetector = beatDetector,
                     isSqueezeEnabled = isSqueezeEnabled,
                     onSqueezeToggle = { 
                         isSqueezeEnabled = it
@@ -157,6 +163,7 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(
     squeezeDetector: SqueezeDetector,
     hapticManager: HapticManager,
+    beatDetector: BeatDetector,
     isSqueezeEnabled: Boolean,
     onSqueezeToggle: (Boolean) -> Unit,
     isShakeEnabled: Boolean,
@@ -211,6 +218,8 @@ fun MainScreen(
                 }
             )
             Spacer(modifier = Modifier.height(16.dp))
+            BeatPlayerCard(beatDetector)
+            Spacer(modifier = Modifier.height(16.dp))
             SqueezeDetectorCard(squeezeDetector, isSqueezeEnabled, onSqueezeToggle)
             Spacer(modifier = Modifier.height(16.dp))
             ShakeDetectorCard(isShakeEnabled, onShakeToggle, shakeSensitivityValue, onShakeSensitivityChange)
@@ -225,6 +234,222 @@ fun MainScreen(
             Spacer(modifier = Modifier.height(16.dp))
             LoggerCard()
             Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun BeatPlayerCard(beatDetector: BeatDetector) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val playerState by beatDetector.playerState.collectAsState()
+    
+    var selectedProfile by remember { mutableStateOf(BeatProfile.AMPLITUDE) }
+    var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedFileName by remember { mutableStateOf("No file selected") }
+    var analysisProgress by remember { mutableStateOf(0f) }
+    var isAnalyzing by remember { mutableStateOf(false) }
+    var detectedBeats by remember { mutableStateOf<List<DetectedBeat>>(emptyList()) }
+
+    // List of audio files in authorized folders
+    var audioFiles by remember { mutableStateOf<List<Pair<String, Uri>>>(emptyList()) }
+    var expandedFiles by remember { mutableStateOf(false) }
+    var expandedProfiles by remember { mutableStateOf(false) }
+
+    val folderUris = remember { SettingsManager.authorizedFolderUris }
+
+    // Refresh file list when folders change
+    LaunchedEffect(folderUris) {
+        val files = mutableListOf<Pair<String, Uri>>()
+        folderUris.forEach { uriString ->
+            val rootUri = Uri.parse(uriString)
+            try {
+                val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                    rootUri,
+                    DocumentsContract.getTreeDocumentId(rootUri)
+                )
+                context.contentResolver.query(
+                    childrenUri,
+                    arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_MIME_TYPE),
+                    null, null, null
+                )?.use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val name = cursor.getString(0)
+                        val id = cursor.getString(1)
+                        val mime = cursor.getString(2)
+                        if (mime.startsWith("audio/")) {
+                            files.add(name to DocumentsContract.buildDocumentUriUsingTree(rootUri, id))
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Logger.error("Access error for $uriString: ${e.message}")
+            }
+        }
+        audioFiles = files
+    }
+
+    // Auto-load profile when track or profile changes
+    LaunchedEffect(selectedFileUri, selectedProfile) {
+        val uri = selectedFileUri
+        if (uri != null) {
+            val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
+            if (rootUri != null) {
+                val existingProfileUri = beatDetector.findExistingProfile(rootUri, selectedFileName, selectedProfile)
+                if (existingProfileUri != null) {
+                    val beats = beatDetector.loadProfile(existingProfileUri)
+                    if (beats != null) {
+                        detectedBeats = beats
+                        Logger.info("Profile loaded automatically.")
+                    }
+                } else {
+                    detectedBeats = emptyList()
+                }
+            }
+        }
+    }
+
+    SectionCard(title = "Bilateral Beat Player") {
+        Column {
+            // Track Selector
+            Box {
+                OutlinedButton(onClick = { expandedFiles = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(selectedFileName)
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                }
+                DropdownMenu(expanded = expandedFiles, onDismissRequest = { expandedFiles = false }) {
+                    if (audioFiles.isEmpty()) {
+                        DropdownMenuItem(text = { Text("No audio files found") }, onClick = { expandedFiles = false })
+                    }
+                    audioFiles.forEach { (name, uri) ->
+                        DropdownMenuItem(
+                            text = { Text(name) },
+                            onClick = {
+                                selectedFileUri = uri
+                                selectedFileName = name
+                                expandedFiles = false
+                                detectedBeats = emptyList()
+                                Logger.info("Selected track: $name")
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Profile Selector
+            Box {
+                OutlinedButton(onClick = { expandedProfiles = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Profile: ${selectedProfile.name}")
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                }
+                DropdownMenu(expanded = expandedProfiles, onDismissRequest = { expandedProfiles = false }) {
+                    BeatProfile.entries.forEach { profile ->
+                        DropdownMenuItem(
+                            text = { Text(profile.name) },
+                            onClick = {
+                                selectedProfile = profile
+                                expandedProfiles = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (isAnalyzing) {
+                Text("Analyzing beats: ${(analysisProgress * 100).toInt()}%")
+                LinearProgressIndicator(progress = { analysisProgress }, modifier = Modifier.fillMaxWidth())
+            } else if (detectedBeats.isEmpty()) {
+                Button(
+                    onClick = {
+                        val uri = selectedFileUri
+                        if (uri != null) {
+                            val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
+                            if (rootUri != null) {
+                                isAnalyzing = true
+                                scope.launch {
+                                    val result = beatDetector.analyzeAudioUri(uri, selectedProfile) { progress ->
+                                        analysisProgress = progress
+                                    }
+                                    if (result.isNotEmpty()) {
+                                        beatDetector.saveProfile(rootUri, selectedFileName, selectedProfile, result)
+                                        detectedBeats = result
+                                    }
+                                    isAnalyzing = false
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = selectedFileUri != null && !playerState.isPlaying
+                ) {
+                    Text("Analyze Audio")
+                }
+            }
+
+            if (detectedBeats.isNotEmpty() || playerState.isPlaying) {
+                if (playerState.isPlaying) {
+                    val progress = if (playerState.totalDurationMs > 0) playerState.currentTimestampMs.toFloat() / playerState.totalDurationMs.toFloat() else 0f
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Playing: ${(playerState.currentTimestampMs/1000)}s / ${(playerState.totalDurationMs/1000)}s", style = MaterialTheme.typography.bodySmall)
+                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { beatDetector.stopPlayback() },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Stop, contentDescription = null)
+                            Text("Stop Playback")
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("${detectedBeats.size} beats ready", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        
+                        Button(
+                            onClick = { 
+                                val uri = selectedFileUri
+                                if (uri != null) beatDetector.playSynchronized(uri, detectedBeats)
+                            },
+                            modifier = Modifier.combinedClickable(
+                                onClick = { 
+                                    val uri = selectedFileUri
+                                    if (uri != null) beatDetector.playSynchronized(uri, detectedBeats)
+                                },
+                                onLongClick = {
+                                    val uri = selectedFileUri
+                                    val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
+                                    if (uri != null && rootUri != null) {
+                                        isAnalyzing = true
+                                        scope.launch {
+                                            val result = beatDetector.analyzeAudioUri(uri, selectedProfile) { progress ->
+                                                analysisProgress = progress
+                                            }
+                                            if (result.isNotEmpty()) {
+                                                beatDetector.saveProfile(rootUri, selectedFileName, selectedProfile, result)
+                                                detectedBeats = result
+                                            }
+                                            isAnalyzing = false
+                                        }
+                                    }
+                                }
+                            ).weight(1f).padding(horizontal = 4.dp)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                            Text("Play (Hold to Refresh)")
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -250,7 +475,7 @@ fun MediaFoldersCard() {
     }
 
     SectionCard(
-        title = "Media Sources",
+        title = "Media Folders",
         actions = {
             IconButton(onClick = { openFolderLauncher.launch(null) }) {
                 Icon(Icons.Default.Add, contentDescription = "Add Folder")
@@ -281,7 +506,7 @@ fun MediaFoldersCard() {
                             SettingsManager.authorizedFolderUris = newUris
                             Logger.info("Removed folder access.")
                         }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Remove", tint = Color.Gray) // Replace with clear/delete icon if available
+                            Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color.Gray)
                         }
                     }
                 }
@@ -592,6 +817,7 @@ fun MainScreenPreview() {
         MainScreen(
             squeezeDetector = fakeDetector,
             hapticManager = HapticManager,
+            beatDetector = BeatDetector(LocalContext.current),
             isSqueezeEnabled = true,
             onSqueezeToggle = {},
             isShakeEnabled = true,
