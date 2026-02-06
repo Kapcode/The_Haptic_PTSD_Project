@@ -31,6 +31,30 @@ This document contains technical details, architectural decisions, and developme
 - **Session Management**: Timer-based sessions with auto-stop and "reset-on-trigger" extension logic.
 - **Testing**: `testPulseSequence()` provides a 3-beat burst to allow immediate tuning of BPM and intensity.
 
+## Bilateral Beat Player & Stimulation (Planned)
+
+### Overview
+A multi-device feature designed for Bilateral Stimulation (BLS) using audio-synchronized haptics across two phones connected via Bluetooth.
+
+### Step 1: Audio Analysis & Beat Detection
+- **Goal**: Analyze an audio file (e.g., MP3/WAV) to detect rhythmic peaks or transients.
+- **Implementation**: Use FFT (via `JTransforms`) or amplitude thresholding on PCM data to identify "beats".
+- **Separation**: Distinguish between Left and Right channel peaks for alternating stimulation.
+
+### Step 2: Metadata Creation (.mdi files)
+- **Format**: A custom `.mdi` (Motion Data Interface) file generated alongside the audio.
+- **Data**: Stores timestamps and channel mapping (L/R) for each detected beat.
+- **Purpose**: Low-latency lookup for haptic triggers during playback without re-analyzing the audio.
+
+### Step 3: Bluetooth Coordination
+- **Protocol**: Bluetooth Classic (SPP) or BLE for low-latency synchronization.
+- **Logic**: 
+    - **Primary Phone**: Plays the audio and handles its own arm's haptics (e.g., Right). Sends a small sync trigger over Bluetooth to the secondary phone.
+    - **Secondary Phone**: Listens for Bluetooth triggers and fires its local haptic motor (e.g., Left).
+
+### Step 4: Synchronized Playback
+- **Mechanism**: Use a shared reference clock to ensure the audio and haptic pulses remain in phase over long sessions.
+
 ## Software Architecture
 
 ### Logging System (`Logger.kt`)

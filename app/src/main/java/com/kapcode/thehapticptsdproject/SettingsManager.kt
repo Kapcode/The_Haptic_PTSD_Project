@@ -42,4 +42,9 @@ object SettingsManager {
     var sessionDurationSeconds: Int
         get() = prefs.getInt("haptic_session_duration", 120)
         set(value) = prefs.edit().putInt("haptic_session_duration", value).apply()
+
+    // Authorized Media Folders (SAF URIs)
+    var authorizedFolderUris: Set<String>
+        get() = prefs.getStringSet("authorized_folder_uris", emptySet()) ?: emptySet()
+        set(value) = prefs.edit().putStringSet("authorized_folder_uris", value).apply()
 }

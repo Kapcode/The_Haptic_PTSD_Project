@@ -8,8 +8,10 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +23,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -213,12 +217,75 @@ fun MainScreen(
             Spacer(modifier = Modifier.height(16.dp))
             HapticControlCard(hapticManager)
             Spacer(modifier = Modifier.height(16.dp))
+            MediaFoldersCard()
+            Spacer(modifier = Modifier.height(16.dp))
             SectionCard(title = "Alarm Settings") {
                 Text("Configure triggers and wake-up alerts.")
             }
             Spacer(modifier = Modifier.height(16.dp))
             LoggerCard()
             Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+fun MediaFoldersCard() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var folderUris by remember { mutableStateOf(SettingsManager.authorizedFolderUris) }
+    
+    val openFolderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        uri?.let {
+            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            context.contentResolver.takePersistableUriPermission(it, flags)
+            
+            val newUris = folderUris.toMutableSet()
+            newUris.add(it.toString())
+            folderUris = newUris
+            SettingsManager.authorizedFolderUris = newUris
+            Logger.info("Added authorized folder: ${it.path}")
+        }
+    }
+
+    SectionCard(
+        title = "Media Sources",
+        actions = {
+            IconButton(onClick = { openFolderLauncher.launch(null) }) {
+                Icon(Icons.Default.Add, contentDescription = "Add Folder")
+            }
+        }
+    ) {
+        Column {
+            if (folderUris.isEmpty()) {
+                Text("No folders authorized. Add a folder to scan for audio files.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            } else {
+                folderUris.forEach { uriString ->
+                    val uri = Uri.parse(uriString)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = uri.path?.substringAfterLast(":") ?: "Folder",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = {
+                            val newUris = folderUris.toMutableSet()
+                            newUris.remove(uriString)
+                            folderUris = newUris
+                            SettingsManager.authorizedFolderUris = newUris
+                            Logger.info("Removed folder access.")
+                        }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Remove", tint = Color.Gray) // Replace with clear/delete icon if available
+                        }
+                    }
+                }
+            }
         }
     }
 }
