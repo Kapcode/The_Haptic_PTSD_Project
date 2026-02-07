@@ -46,3 +46,6 @@ This project explores the intersection of **Haptic Grounding Therapy** and **Mob
 
 ## Future Exploration
 - Bilateral Stimulation: Support for dual-device connectivity via Bluetooth to provide alternating pulses on each arm.
+
+## Ideas
+- **Picture-in-Picture (PiP) Haptic Visualizer:** A real-time visualizer that shows the current intensity of the haptic engine. This would provide clear feedback on when the app is generating vibrations. It should support multiple devices, each with 1-2 motors, to give a comprehensive view of the haptic output.

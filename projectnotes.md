@@ -31,29 +31,24 @@ This document contains technical details, architectural decisions, and developme
 - **Session Management**: Timer-based sessions with auto-stop and "reset-on-trigger" extension logic.
 - **Testing**: `testPulseSequence()` provides a 3-beat burst to allow immediate tuning of BPM and intensity.
 
-## Bilateral Beat Player & Stimulation (Planned)
+## Future Features & Ideas
 
-### Overview
-A multi-device feature designed for Bilateral Stimulation (BLS) using audio-synchronized haptics across two phones connected via Bluetooth.
+### Picture-in-Picture (PiP) Haptic Visualizer
+- **Goal**: Provide clear, real-time visual feedback on when the app is generating vibrations, addressing potential user uncertainty.
+- **UI**: A Picture-in-Picture (PiP) window that can overlay other apps or the home screen.
+- **Visualization**: The visualizer will show the current intensity of the haptic motor(s). This could be represented by bars that animate in height and color based on the intensity value from `HapticManager`.
+- **Multi-device/motor Support**: The design should be flexible enough to support:
+    - A single device with one motor.
+    - A single device with multiple motors (e.g., left/right exciters).
+    - Multiple connected devices (part of the bilateral stimulation goal), each with its own motor visualization.
 
-### Step 1: Audio Analysis & Beat Detection
-- **Goal**: Analyze an audio file (e.g., MP3/WAV) to detect rhythmic peaks or transients.
-- **Implementation**: Use FFT (via `JTransforms`) or amplitude thresholding on PCM data to identify "beats".
-- **Separation**: Distinguish between Left and Right channel peaks for alternating stimulation.
+### Bilateral Beat Player & Stimulation (Planned)
+- **Overview**: A multi-device feature designed for Bilateral Stimulation (BLS) using audio-synchronized haptics across two phones connected via Bluetooth.
+- **Step 1: Audio Analysis & Beat Detection**: Analyze an audio file (e.g., MP3/WAV) to detect rhythmic peaks or transients. Distinguish between Left and Right channel peaks for alternating stimulation.
+- **Step 2: Metadata Creation (.mdi files)**: A custom `.mdi` (Motion Data Interface) file generated alongside the audio to store timestamps and channel mapping (L/R) for each detected beat.
+- **Step 3: Bluetooth Coordination**: Use Bluetooth Classic (SPP) or BLE for low-latency synchronization. A primary phone will play audio and send sync triggers to a secondary phone.
+- **Step 4: Synchronized Playback**: Use a shared reference clock to ensure the audio and haptic pulses remain in phase.
 
-### Step 2: Metadata Creation (.mdi files)
-- **Format**: A custom `.mdi` (Motion Data Interface) file generated alongside the audio.
-- **Data**: Stores timestamps and channel mapping (L/R) for each detected beat.
-- **Purpose**: Low-latency lookup for haptic triggers during playback without re-analyzing the audio.
-
-### Step 3: Bluetooth Coordination
-- **Protocol**: Bluetooth Classic (SPP) or BLE for low-latency synchronization.
-- **Logic**: 
-    - **Primary Phone**: Plays the audio and handles its own arm's haptics (e.g., Right). Sends a small sync trigger over Bluetooth to the secondary phone.
-    - **Secondary Phone**: Listens for Bluetooth triggers and fires its local haptic motor (e.g., Left).
-
-### Step 4: Synchronized Playback
-- **Mechanism**: Use a shared reference clock to ensure the audio and haptic pulses remain in phase over long sessions.
 
 ## Software Architecture
 

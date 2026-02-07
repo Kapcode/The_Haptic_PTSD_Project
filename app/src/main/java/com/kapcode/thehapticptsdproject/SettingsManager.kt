@@ -47,6 +47,10 @@ object SettingsManager {
     var beatMaxIntensity: Float
         get() = prefs.getFloat("beat_max_intensity", 1.0f)
         set(value) = prefs.edit().putFloat("beat_max_intensity", value).apply()
+        
+    var mediaVolume: Float
+        get() = prefs.getFloat("media_volume", 1.0f)
+        set(value) = prefs.edit().putFloat("media_volume", value).apply()
 
     // Authorized Media Folders (SAF URIs)
     var authorizedFolderUris: Set<String>

@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -45,9 +46,7 @@ import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var hapticManager: HapticManager
     private lateinit var squeezeDetector: SqueezeDetector
-    private lateinit var beatDetector: BeatDetector
 
     // State for switches and sensitivity (initialized from SettingsManager)
     private var isSqueezeEnabled by mutableStateOf(false)
@@ -64,11 +63,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SettingsManager.init(this)
         HapticManager.init(this)
+        BeatDetector.init()
         
         isSqueezeEnabled = SettingsManager.isSqueezeEnabled
         isShakeEnabled = SettingsManager.isShakeEnabled
@@ -76,13 +75,9 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
 
-        hapticManager = HapticManager
-        hapticManager.updateIntensity(SettingsManager.intensity)
-        hapticManager.updateBpm(SettingsManager.bpm)
-        hapticManager.updateSessionDuration(SettingsManager.sessionDurationSeconds)
-
-        beatDetector = BeatDetector
-        beatDetector.init()
+        HapticManager.updateIntensity(SettingsManager.intensity)
+        HapticManager.updateBpm(SettingsManager.bpm)
+        HapticManager.updateSessionDuration(SettingsManager.sessionDurationSeconds)
 
         // Local detector for calibration UI
         squeezeDetector = SqueezeDetector {}
@@ -92,8 +87,6 @@ class MainActivity : ComponentActivity() {
             TheHapticPTSDProjectTheme {
                 MainScreen(
                     squeezeDetector = squeezeDetector,
-                    hapticManager = hapticManager,
-                    beatDetector = beatDetector,
                     isSqueezeEnabled = isSqueezeEnabled,
                     onSqueezeToggle = { 
                         isSqueezeEnabled = it
@@ -163,13 +156,10 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     squeezeDetector: SqueezeDetector,
-    hapticManager: HapticManager,
-    beatDetector: BeatDetector,
     isSqueezeEnabled: Boolean,
     onSqueezeToggle: (Boolean) -> Unit,
     isShakeEnabled: Boolean,
@@ -236,13 +226,13 @@ fun MainScreen(
                 }
             )
             Spacer(modifier = Modifier.height(16.dp))
-            BeatPlayerCard(beatDetector)
+            BeatPlayerCard()
             Spacer(modifier = Modifier.height(16.dp))
             SqueezeDetectorCard(squeezeDetector, isSqueezeEnabled, onSqueezeToggle)
             Spacer(modifier = Modifier.height(16.dp))
             ShakeDetectorCard(isShakeEnabled, onShakeToggle, shakeSensitivityValue, onShakeSensitivityChange)
             Spacer(modifier = Modifier.height(16.dp))
-            HapticControlCard(hapticManager)
+            HapticControlCard()
             Spacer(modifier = Modifier.height(16.dp))
             MediaFoldersCard()
             Spacer(modifier = Modifier.height(16.dp))
@@ -256,18 +246,15 @@ fun MainScreen(
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun BeatPlayerCard(beatDetector: BeatDetector) {
+fun BeatPlayerCard() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val playerState by beatDetector.playerState.collectAsState()
+    val playerState by BeatDetector.playerState.collectAsState()
     
     var selectedProfile by remember { mutableStateOf(BeatProfile.AMPLITUDE) }
-    var analysisProgress by remember { mutableStateOf(0f) }
-    var isAnalyzing by remember { mutableStateOf(false) }
-
+    
     // List of audio files in authorized folders
     var audioFiles by remember { mutableStateOf<List<Pair<String, Uri>>>(emptyList()) }
     var expandedFiles by remember { mutableStateOf(false) }
@@ -311,9 +298,9 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
         if (uri != null) {
             val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
             if (rootUri != null) {
-                val existingProfileUri = beatDetector.findExistingProfile(context, rootUri, playerState.selectedFileName, selectedProfile)
+                val existingProfileUri = BeatDetector.findExistingProfile(context, rootUri, playerState.selectedFileName, selectedProfile)
                 if (existingProfileUri != null) {
-                    beatDetector.loadProfile(context, existingProfileUri)
+                    BeatDetector.loadProfile(context, existingProfileUri)
                     Logger.info("Profile loaded automatically.")
                 }
             }
@@ -335,7 +322,7 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
                         DropdownMenuItem(
                             text = { Text(name) },
                             onClick = {
-                                beatDetector.updateSelectedTrack(uri, name)
+                                BeatDetector.updateSelectedTrack(uri, name)
                                 expandedFiles = false
                                 Logger.info("Selected track: $name")
                             }
@@ -371,7 +358,20 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
             Slider(
                 value = masterIntensity,
                 onValueChange = { 
-                    beatDetector.updateMasterIntensity(it)
+                    BeatDetector.updateMasterIntensity(it)
+                },
+                valueRange = 0f..1f,
+                enabled = true 
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            val mediaVolume = playerState.mediaVolume
+            Text("Media Volume: ${(mediaVolume * 100).toInt()}%")
+            Slider(
+                value = mediaVolume,
+                onValueChange = { 
+                    BeatDetector.updateMediaVolume(it)
                 },
                 valueRange = 0f..1f,
                 enabled = true 
@@ -379,10 +379,9 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (isAnalyzing || playerState.isAnalyzing) {
-                val progress = if (isAnalyzing) analysisProgress else playerState.analysisProgress
-                Text("Analyzing beats: ${(progress * 100).toInt()}%")
-                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            if (playerState.isAnalyzing) {
+                Text("Analyzing beats: ${(playerState.analysisProgress * 100).toInt()}%")
+                LinearProgressIndicator(progress = { playerState.analysisProgress }, modifier = Modifier.fillMaxWidth())
             } else if (playerState.detectedBeats.isEmpty()) {
                 Button(
                     onClick = {
@@ -390,15 +389,11 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
                         if (uri != null) {
                             val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
                             if (rootUri != null) {
-                                isAnalyzing = true
                                 scope.launch {
-                                    val result = beatDetector.analyzeAudioUri(context, uri, selectedProfile) { progress ->
-                                        analysisProgress = progress
-                                    }
+                                    val result = BeatDetector.analyzeAudioUri(context, uri, selectedProfile)
                                     if (result.isNotEmpty()) {
-                                        beatDetector.saveProfile(context, rootUri, playerState.selectedFileName, selectedProfile, result)
+                                        BeatDetector.saveProfile(context, rootUri, playerState.selectedFileName, selectedProfile, result)
                                     }
-                                    isAnalyzing = false
                                 }
                             }
                         }
@@ -418,7 +413,7 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
                         LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
                         Spacer(modifier = Modifier.height(8.dp))
                         Button(
-                            onClick = { beatDetector.stopPlayback() },
+                            onClick = { BeatDetector.stopPlayback() },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -434,34 +429,56 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
                     ) {
                         Text("${playerState.detectedBeats.size} beats ready", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                         
-                        Button(
-                            onClick = { 
-                                beatDetector.playSynchronized(context)
-                            },
-                            modifier = Modifier.combinedClickable(
-                                onClick = { 
-                                    beatDetector.playSynchronized(context)
-                                },
-                                onLongClick = {
-                                    val uri = playerState.selectedFileUri
-                                    val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
-                                    if (uri != null && rootUri != null) {
-                                        isAnalyzing = true
-                                        scope.launch {
-                                            val result = beatDetector.analyzeAudioUri(context, uri, selectedProfile) { progress ->
-                                                analysisProgress = progress
+                        Card(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 4.dp)
+                                .combinedClickable(
+                                    onClick = {
+                                        BeatDetector.playSynchronized(context)
+                                    },
+                                    onLongClick = {
+                                        val uri = playerState.selectedFileUri
+                                        val rootUri =
+                                            folderUris.firstOrNull { uri.toString().startsWith(it) }
+                                                ?.let { Uri.parse(it) }
+                                        if (uri != null && rootUri != null) {
+                                            scope.launch {
+                                                val result = BeatDetector.analyzeAudioUri(
+                                                    context,
+                                                    uri,
+                                                    selectedProfile
+                                                )
+                                                if (result.isNotEmpty()) {
+                                                    BeatDetector.saveProfile(
+                                                        context,
+                                                        rootUri,
+                                                        playerState.selectedFileName,
+                                                        selectedProfile,
+                                                        result
+                                                    )
+                                                }
                                             }
-                                            if (result.isNotEmpty()) {
-                                                beatDetector.saveProfile(context, rootUri, playerState.selectedFileName, selectedProfile, result)
-                                            }
-                                            isAnalyzing = false
                                         }
                                     }
-                                }
-                            ).weight(1f).padding(horizontal = 4.dp)
+                                ),
+                            shape = ButtonDefaults.shape,
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null)
-                            Text("Play (Hold to Refresh)")
+                            Row(
+                                modifier = Modifier
+                                    .padding(ButtonDefaults.ContentPadding)
+                                    .fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                                Text("Play (Hold to Refresh)")
+                            }
                         }
                     }
                 }
@@ -596,10 +613,9 @@ fun ShakeDetectorCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit, sensitivi
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun HapticControlCard(hapticManager: HapticManager) {
-    val state by hapticManager.state.collectAsState()
+fun HapticControlCard() {
+    val state by HapticManager.state.collectAsState()
 
     SectionCard(title = "Haptic Heartbeat") {
         Column {
@@ -631,7 +647,7 @@ fun HapticControlCard(hapticManager: HapticManager) {
                 value = state.intensity,
                 onValueChange = { 
                     val snappedValue = (Math.round(it * 20) / 20f).coerceIn(0f, 1f)
-                    hapticManager.updateIntensity(snappedValue)
+                    HapticManager.updateIntensity(snappedValue)
                     SettingsManager.intensity = snappedValue
                 },
                 valueRange = 0f..1f,
@@ -645,7 +661,7 @@ fun HapticControlCard(hapticManager: HapticManager) {
                 onValueChange = { 
                     val snappedValue = Math.round(it / 5f) * 5f
                     val newBpm = snappedValue.toInt()
-                    hapticManager.updateBpm(newBpm)
+                    HapticManager.updateBpm(newBpm)
                     SettingsManager.bpm = newBpm
                 },
                 valueRange = 30f..200f,
@@ -659,7 +675,7 @@ fun HapticControlCard(hapticManager: HapticManager) {
                 onValueChange = { 
                     val snappedValue = Math.round(it / 50f) * 50f
                     val newDuration = snappedValue.toInt()
-                    hapticManager.updateSessionDuration(newDuration)
+                    HapticManager.updateSessionDuration(newDuration)
                     SettingsManager.sessionDurationSeconds = newDuration
                 },
                 valueRange = 50f..600f,
@@ -668,16 +684,16 @@ fun HapticControlCard(hapticManager: HapticManager) {
 
             Spacer(modifier = Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Button(onClick = { hapticManager.testPulseSequence() }, enabled = !state.isHeartbeatRunning && !state.isTestRunning) {
+                Button(onClick = { HapticManager.testPulseSequence() }, enabled = !state.isHeartbeatRunning && !state.isTestRunning) {
                     Text("Test Sequence")
                 }
                 
                 if (state.isHeartbeatRunning) {
-                    Button(onClick = { hapticManager.stopHeartbeatSession() }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                    Button(onClick = { HapticManager.stopHeartbeatSession() }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
                         Text("Stop Session")
                     }
                 } else {
-                    Button(onClick = { hapticManager.startHeartbeatSession() }, enabled = !state.isTestRunning) {
+                    Button(onClick = { HapticManager.startHeartbeatSession() }, enabled = !state.isTestRunning) {
                         Text("Start Session")
                     }
                 }
@@ -741,6 +757,12 @@ fun ModeItem(mode: PTSDMode, isSelected: Boolean, onClick: () -> Unit) {
 fun LoggerCard() {
     val logHistory by Logger.logHistory.collectAsState()
     var selectedLogLevel by remember { mutableStateOf(LogLevel.DEBUG) }
+    val context = LocalContext.current
+    var logToLogcat by remember { mutableStateOf(Logger.logToLogcat) }
+
+    val isDeveloperMode = remember {
+        Settings.Secure.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+    }
 
     val filteredLogs = remember(logHistory, selectedLogLevel) {
         logHistory.filter { it.level.ordinal >= selectedLogLevel.ordinal }
@@ -779,14 +801,32 @@ fun LoggerCard() {
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = {
-                    Logger.clear()
-                    Logger.info("Logs cleared.")
-                },
-                modifier = Modifier.align(Alignment.End)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Clear Logs")
+                if (isDeveloperMode) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Log to Logcat", style = MaterialTheme.typography.bodySmall)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Switch(
+                            checked = logToLogcat,
+                            onCheckedChange = {
+                                logToLogcat = it
+                                Logger.logToLogcat = it
+                            }
+                        )
+                    }
+                }
+                Button(
+                    onClick = {
+                        Logger.clear()
+                        Logger.info("Logs cleared.")
+                    },
+                ) {
+                    Text("Clear Logs")
+                }
             }
         }
     }
@@ -826,7 +866,6 @@ fun SectionCard(
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
 @Preview(showBackground = true)
 @Composable
 fun MainScreenPreview() {
@@ -834,8 +873,6 @@ fun MainScreenPreview() {
         val fakeDetector = SqueezeDetector {}
         MainScreen(
             squeezeDetector = fakeDetector,
-            hapticManager = HapticManager,
-            beatDetector = BeatDetector,
             isSqueezeEnabled = true,
             onSqueezeToggle = {},
             isShakeEnabled = true,
