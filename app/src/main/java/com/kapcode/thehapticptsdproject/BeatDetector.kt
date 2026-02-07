@@ -44,34 +44,51 @@ data class HapticProfile(
 
 data class BeatPlayerState(
     val isPlaying: Boolean = false,
+    val isAnalyzing: Boolean = false,
+    val analysisProgress: Float = 0f,
     val currentTimestampMs: Long = 0,
     val totalDurationMs: Long = 0,
-    val nextBeatIndex: Int = 0
+    val nextBeatIndex: Int = 0,
+    val selectedFileUri: Uri? = null,
+    val selectedFileName: String = "No file selected",
+    val detectedBeats: List<DetectedBeat> = emptyList(),
+    val masterIntensity: Float = 1.0f
 )
 
-class BeatDetector(private val context: Context) {
+object BeatDetector {
 
     private val _playerState = MutableStateFlow(BeatPlayerState())
     val playerState = _playerState.asStateFlow()
 
     private var mediaPlayer: MediaPlayer? = null
     private var playbackJob: Job? = null
-    private var beatsList: List<DetectedBeat> = emptyList()
-
     private var lastGuitarEnergy = 0.0
     private var lastBassEnergy = 0.0
 
-    /**
-     * Checks if a haptic profile already exists for this file and profile type.
-     */
-    fun findExistingProfile(parentUri: Uri, audioFileName: String, profile: BeatProfile): Uri? {
+    fun init() {
+        _playerState.value = _playerState.value.copy(
+            masterIntensity = SettingsManager.beatMaxIntensity
+        )
+    }
+
+    fun updateMasterIntensity(intensity: Float) {
+        _playerState.value = _playerState.value.copy(masterIntensity = intensity)
+        SettingsManager.beatMaxIntensity = intensity
+    }
+
+    fun updateSelectedTrack(uri: Uri?, name: String) {
+        _playerState.value = _playerState.value.copy(
+            selectedFileUri = uri,
+            selectedFileName = name,
+            detectedBeats = emptyList()
+        )
+    }
+
+    fun findExistingProfile(context: Context, parentUri: Uri, audioFileName: String, profile: BeatProfile): Uri? {
         val hapticFileName = "${audioFileName.substringBeforeLast(".")}_${profile.name.lowercase()}.haptic.json"
-        
         try {
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-                parentUri,
-                DocumentsContract.getTreeDocumentId(parentUri)
-            )
+            val rootDocId = DocumentsContract.getTreeDocumentId(parentUri)
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentUri, rootDocId)
             
             context.contentResolver.query(
                 childrenUri,
@@ -85,21 +102,18 @@ class BeatDetector(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
-            // Ignore search errors
+            // Ignore
         }
         return null
     }
 
-    /**
-     * Loads a profile from a JSON file URI.
-     */
-    fun loadProfile(uri: Uri): List<DetectedBeat>? {
+    fun loadProfile(context: Context, uri: Uri): List<DetectedBeat>? {
         return try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
                 val json = Scanner(inputStream).useDelimiter("\\A").next()
                 val profile = Json.decodeFromString<HapticProfile>(json)
-                beatsList = profile.beats
-                beatsList
+                _playerState.value = _playerState.value.copy(detectedBeats = profile.beats)
+                profile.beats
             }
         } catch (e: Exception) {
             Logger.error("Load Error: ${e.message}")
@@ -108,10 +122,12 @@ class BeatDetector(private val context: Context) {
     }
 
     suspend fun analyzeAudioUri(
+        context: Context,
         uri: Uri,
         profile: BeatProfile,
         onProgress: (Float) -> Unit
     ): List<DetectedBeat> = withContext(Dispatchers.Default) {
+        _playerState.value = _playerState.value.copy(isAnalyzing = true, analysisProgress = 0f)
         val beats = mutableListOf<DetectedBeat>()
         val extractor = MediaExtractor()
         lastGuitarEnergy = 0.0
@@ -161,7 +177,9 @@ class BeatDetector(private val context: Context) {
                 val outputIndex = codec.dequeueOutputBuffer(info, 10000)
                 if (outputIndex >= 0) {
                     val presentationTimeMs = info.presentationTimeUs / 1000
-                    onProgress(presentationTimeMs.toFloat() / (durationUs / 1000).toFloat())
+                    val progress = presentationTimeMs.toFloat() / (durationUs / 1000).toFloat()
+                    _playerState.value = _playerState.value.copy(analysisProgress = progress)
+                    onProgress(progress)
 
                     val outputBuffer = codec.getOutputBuffer(outputIndex)!!
                     val currentPcm = ShortArray(info.size / 2)
@@ -182,14 +200,16 @@ class BeatDetector(private val context: Context) {
         } catch (e: Exception) {
             Logger.error("Analysis Error: ${e.message}")
         }
-        beatsList = beats
+        _playerState.value = _playerState.value.copy(detectedBeats = beats, isAnalyzing = false)
         return@withContext beats
     }
 
-    fun playSynchronized(uri: Uri, beats: List<DetectedBeat>) {
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun playSynchronized(context: Context) {
+        val uri = _playerState.value.selectedFileUri ?: return
+        val beats = _playerState.value.detectedBeats
+        if (beats.isEmpty()) return
         stopPlayback()
-        beatsList = beats
-        
         mediaPlayer = MediaPlayer().apply {
             setDataSource(context, uri)
             setAudioAttributes(
@@ -201,21 +221,19 @@ class BeatDetector(private val context: Context) {
             prepare()
             start()
         }
-
-        _playerState.value = BeatPlayerState(
+        _playerState.value = _playerState.value.copy(
             isPlaying = true,
             totalDurationMs = mediaPlayer?.duration?.toLong() ?: 0L,
             nextBeatIndex = 0
         )
-
         playbackJob = CoroutineScope(Dispatchers.Default).launch {
             while (mediaPlayer?.isPlaying == true) {
                 val currentPos = mediaPlayer?.currentPosition?.toLong() ?: 0L
                 _playerState.value = _playerState.value.copy(currentTimestampMs = currentPos)
 
                 val nextIndex = _playerState.value.nextBeatIndex
-                if (nextIndex < beatsList.size) {
-                    val beat = beatsList[nextIndex]
+                if (nextIndex < beats.size) {
+                    val beat = beats[nextIndex]
                     if (currentPos >= beat.timestampMs) {
                         triggerBeatHaptic(beat)
                         _playerState.value = _playerState.value.copy(nextBeatIndex = nextIndex + 1)
@@ -226,11 +244,13 @@ class BeatDetector(private val context: Context) {
             stopPlayback()
         }
     }
-
     @RequiresApi(Build.VERSION_CODES.O)
     private fun triggerBeatHaptic(beat: DetectedBeat) {
+        val maxIntensity = _playerState.value.masterIntensity
+        val scaledIntensity = (beat.intensity * maxIntensity).coerceIn(0f, 1f)
+        
         HapticManager.playPulse(
-            intensityOverride = beat.intensity,
+            intensityOverride = scaledIntensity,
             durationMs = beat.durationMs.toLong()
         )
     }
@@ -240,24 +260,26 @@ class BeatDetector(private val context: Context) {
         mediaPlayer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null
-        _playerState.value = BeatPlayerState(isPlaying = false)
+        _playerState.value = _playerState.value.copy(isPlaying = false)
     }
 
-    fun saveProfile(parentUri: Uri, audioFileName: String, profile: BeatProfile, beats: List<DetectedBeat>) {
+    fun saveProfile(context: Context, parentTreeUri: Uri, audioFileName: String, profile: BeatProfile, beats: List<DetectedBeat>) {
         val hapticProfile = HapticProfile(audioFileName, profile.name, beats)
         val jsonString = Json.encodeToString(hapticProfile)
         val hapticFileName = "${audioFileName.substringBeforeLast(".")}_${profile.name.lowercase()}.haptic.json"
         
         try {
-            // First check if file exists to overwrite
-            val existingUri = findExistingProfile(parentUri, audioFileName, profile)
+            val rootDocId = DocumentsContract.getTreeDocumentId(parentTreeUri)
+            val parentFolderUri = DocumentsContract.buildDocumentUriUsingTree(parentTreeUri, rootDocId)
+
+            val existingUri = findExistingProfile(context, parentTreeUri, audioFileName, profile)
             val targetUri = if (existingUri != null) {
                 Logger.info("Overwriting existing profile: $hapticFileName")
                 existingUri
             } else {
                 DocumentsContract.createDocument(
                     context.contentResolver,
-                    parentUri,
+                    parentFolderUri,
                     "application/json",
                     hapticFileName
                 )

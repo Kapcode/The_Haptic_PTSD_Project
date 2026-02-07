@@ -9,6 +9,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
 import androidx.activity.ComponentActivity
@@ -16,6 +17,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -62,11 +64,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SettingsManager.init(this)
         HapticManager.init(this)
-        beatDetector = BeatDetector(this)
         
         isSqueezeEnabled = SettingsManager.isSqueezeEnabled
         isShakeEnabled = SettingsManager.isShakeEnabled
@@ -78,6 +80,9 @@ class MainActivity : ComponentActivity() {
         hapticManager.updateIntensity(SettingsManager.intensity)
         hapticManager.updateBpm(SettingsManager.bpm)
         hapticManager.updateSessionDuration(SettingsManager.sessionDurationSeconds)
+
+        beatDetector = BeatDetector
+        beatDetector.init()
 
         // Local detector for calibration UI
         squeezeDetector = SqueezeDetector {}
@@ -158,6 +163,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
@@ -173,10 +179,22 @@ fun MainScreen(
     onToggleDetection: (Boolean) -> Unit
 ) {
     var modeState by remember { mutableStateOf(ModeState(activeModes = emptySet())) }
+    val context = LocalContext.current
 
     LaunchedEffect(modeState.activeModes, isSqueezeEnabled, isShakeEnabled) {
         val isActiveHeartbeatActive = PTSDMode.ActiveHeartbeat in modeState.activeModes
-        onToggleDetection(isActiveHeartbeatActive)
+        val isBBPlayerActive = PTSDMode.BBPlayer in modeState.activeModes
+        
+        onToggleDetection(isActiveHeartbeatActive || isBBPlayerActive)
+        
+        val intent = Intent(context, HapticService::class.java).apply {
+            action = HapticService.ACTION_UPDATE_MODES
+            putExtra(HapticService.EXTRA_BB_PLAYER_ACTIVE, isBBPlayerActive)
+            putExtra(HapticService.EXTRA_HEARTBEAT_ACTIVE, isActiveHeartbeatActive)
+        }
+        if (isActiveHeartbeatActive || isBBPlayerActive) {
+            context.startService(intent)
+        }
     }
 
     Scaffold(
@@ -238,6 +256,7 @@ fun MainScreen(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BeatPlayerCard(beatDetector: BeatDetector) {
@@ -246,11 +265,8 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
     val playerState by beatDetector.playerState.collectAsState()
     
     var selectedProfile by remember { mutableStateOf(BeatProfile.AMPLITUDE) }
-    var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
-    var selectedFileName by remember { mutableStateOf("No file selected") }
     var analysisProgress by remember { mutableStateOf(0f) }
     var isAnalyzing by remember { mutableStateOf(false) }
-    var detectedBeats by remember { mutableStateOf<List<DetectedBeat>>(emptyList()) }
 
     // List of audio files in authorized folders
     var audioFiles by remember { mutableStateOf<List<Pair<String, Uri>>>(emptyList()) }
@@ -259,7 +275,6 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
 
     val folderUris = remember { SettingsManager.authorizedFolderUris }
 
-    // Refresh file list when folders change
     LaunchedEffect(folderUris) {
         val files = mutableListOf<Pair<String, Uri>>()
         folderUris.forEach { uriString ->
@@ -284,27 +299,22 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
                     }
                 }
             } catch (e: Exception) {
-                Logger.error("Access error for $uriString: ${e.message}")
+                Logger.error("Access error: ${e.message}")
             }
         }
         audioFiles = files
     }
 
     // Auto-load profile when track or profile changes
-    LaunchedEffect(selectedFileUri, selectedProfile) {
-        val uri = selectedFileUri
+    LaunchedEffect(playerState.selectedFileUri, selectedProfile) {
+        val uri = playerState.selectedFileUri
         if (uri != null) {
             val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
             if (rootUri != null) {
-                val existingProfileUri = beatDetector.findExistingProfile(rootUri, selectedFileName, selectedProfile)
+                val existingProfileUri = beatDetector.findExistingProfile(context, rootUri, playerState.selectedFileName, selectedProfile)
                 if (existingProfileUri != null) {
-                    val beats = beatDetector.loadProfile(existingProfileUri)
-                    if (beats != null) {
-                        detectedBeats = beats
-                        Logger.info("Profile loaded automatically.")
-                    }
-                } else {
-                    detectedBeats = emptyList()
+                    beatDetector.loadProfile(context, existingProfileUri)
+                    Logger.info("Profile loaded automatically.")
                 }
             }
         }
@@ -312,10 +322,9 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
 
     SectionCard(title = "Bilateral Beat Player") {
         Column {
-            // Track Selector
             Box {
                 OutlinedButton(onClick = { expandedFiles = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text(selectedFileName)
+                    Text(playerState.selectedFileName)
                     Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                 }
                 DropdownMenu(expanded = expandedFiles, onDismissRequest = { expandedFiles = false }) {
@@ -326,10 +335,8 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
                         DropdownMenuItem(
                             text = { Text(name) },
                             onClick = {
-                                selectedFileUri = uri
-                                selectedFileName = name
+                                beatDetector.updateSelectedTrack(uri, name)
                                 expandedFiles = false
-                                detectedBeats = emptyList()
                                 Logger.info("Selected track: $name")
                             }
                         )
@@ -339,7 +346,6 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Profile Selector
             Box {
                 OutlinedButton(onClick = { expandedProfiles = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Profile: ${selectedProfile.name}")
@@ -358,26 +364,39 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
                 }
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            val masterIntensity = playerState.masterIntensity
+            Text("Master Max Haptics: ${(masterIntensity * 100).toInt()}%")
+            Slider(
+                value = masterIntensity,
+                onValueChange = { 
+                    beatDetector.updateMasterIntensity(it)
+                },
+                valueRange = 0f..1f,
+                enabled = true 
+            )
+
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (isAnalyzing) {
-                Text("Analyzing beats: ${(analysisProgress * 100).toInt()}%")
-                LinearProgressIndicator(progress = { analysisProgress }, modifier = Modifier.fillMaxWidth())
-            } else if (detectedBeats.isEmpty()) {
+            if (isAnalyzing || playerState.isAnalyzing) {
+                val progress = if (isAnalyzing) analysisProgress else playerState.analysisProgress
+                Text("Analyzing beats: ${(progress * 100).toInt()}%")
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            } else if (playerState.detectedBeats.isEmpty()) {
                 Button(
                     onClick = {
-                        val uri = selectedFileUri
+                        val uri = playerState.selectedFileUri
                         if (uri != null) {
                             val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
                             if (rootUri != null) {
                                 isAnalyzing = true
                                 scope.launch {
-                                    val result = beatDetector.analyzeAudioUri(uri, selectedProfile) { progress ->
+                                    val result = beatDetector.analyzeAudioUri(context, uri, selectedProfile) { progress ->
                                         analysisProgress = progress
                                     }
                                     if (result.isNotEmpty()) {
-                                        beatDetector.saveProfile(rootUri, selectedFileName, selectedProfile, result)
-                                        detectedBeats = result
+                                        beatDetector.saveProfile(context, rootUri, playerState.selectedFileName, selectedProfile, result)
                                     }
                                     isAnalyzing = false
                                 }
@@ -385,13 +404,13 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = selectedFileUri != null && !playerState.isPlaying
+                    enabled = playerState.selectedFileUri != null && !playerState.isPlaying
                 ) {
                     Text("Analyze Audio")
                 }
             }
 
-            if (detectedBeats.isNotEmpty() || playerState.isPlaying) {
+            if (playerState.detectedBeats.isNotEmpty() || playerState.isPlaying) {
                 if (playerState.isPlaying) {
                     val progress = if (playerState.totalDurationMs > 0) playerState.currentTimestampMs.toFloat() / playerState.totalDurationMs.toFloat() else 0f
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -413,30 +432,27 @@ fun BeatPlayerCard(beatDetector: BeatDetector) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("${detectedBeats.size} beats ready", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        Text("${playerState.detectedBeats.size} beats ready", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                         
                         Button(
                             onClick = { 
-                                val uri = selectedFileUri
-                                if (uri != null) beatDetector.playSynchronized(uri, detectedBeats)
+                                beatDetector.playSynchronized(context)
                             },
                             modifier = Modifier.combinedClickable(
                                 onClick = { 
-                                    val uri = selectedFileUri
-                                    if (uri != null) beatDetector.playSynchronized(uri, detectedBeats)
+                                    beatDetector.playSynchronized(context)
                                 },
                                 onLongClick = {
-                                    val uri = selectedFileUri
+                                    val uri = playerState.selectedFileUri
                                     val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
                                     if (uri != null && rootUri != null) {
                                         isAnalyzing = true
                                         scope.launch {
-                                            val result = beatDetector.analyzeAudioUri(uri, selectedProfile) { progress ->
+                                            val result = beatDetector.analyzeAudioUri(context, uri, selectedProfile) { progress ->
                                                 analysisProgress = progress
                                             }
                                             if (result.isNotEmpty()) {
-                                                beatDetector.saveProfile(rootUri, selectedFileName, selectedProfile, result)
-                                                detectedBeats = result
+                                                beatDetector.saveProfile(context, rootUri, playerState.selectedFileName, selectedProfile, result)
                                             }
                                             isAnalyzing = false
                                         }
@@ -580,6 +596,7 @@ fun ShakeDetectorCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit, sensitivi
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun HapticControlCard(hapticManager: HapticManager) {
     val state by hapticManager.state.collectAsState()
@@ -674,7 +691,7 @@ fun ModesSection(
     activeModes: Set<PTSDMode>,
     onModeToggled: (PTSDMode) -> Unit
 ) {
-    val modes = listOf(PTSDMode.ActiveHeartbeat, PTSDMode.SleepAssistance, PTSDMode.GroundingMode)
+    val modes = listOf(PTSDMode.ActiveHeartbeat, PTSDMode.BBPlayer, PTSDMode.SleepAssistance, PTSDMode.GroundingMode)
 
     SectionCard(title = "Modes") {
         Column {
@@ -809,6 +826,7 @@ fun SectionCard(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Preview(showBackground = true)
 @Composable
 fun MainScreenPreview() {
@@ -817,7 +835,7 @@ fun MainScreenPreview() {
         MainScreen(
             squeezeDetector = fakeDetector,
             hapticManager = HapticManager,
-            beatDetector = BeatDetector(LocalContext.current),
+            beatDetector = BeatDetector,
             isSqueezeEnabled = true,
             onSqueezeToggle = {},
             isShakeEnabled = true,

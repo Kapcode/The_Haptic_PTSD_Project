@@ -43,6 +43,11 @@ object SettingsManager {
         get() = prefs.getInt("haptic_session_duration", 120)
         set(value) = prefs.edit().putInt("haptic_session_duration", value).apply()
 
+    // Beat Player Settings
+    var beatMaxIntensity: Float
+        get() = prefs.getFloat("beat_max_intensity", 1.0f)
+        set(value) = prefs.edit().putFloat("beat_max_intensity", value).apply()
+
     // Authorized Media Folders (SAF URIs)
     var authorizedFolderUris: Set<String>
         get() = prefs.getStringSet("authorized_folder_uris", emptySet()) ?: emptySet()

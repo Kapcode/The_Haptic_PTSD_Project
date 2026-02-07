@@ -2,6 +2,7 @@ package com.kapcode.thehapticptsdproject
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -17,6 +18,13 @@ sealed class PTSDMode(
         name = "Active Heartbeat",
         description = "Trigger on squeeze or shake, a heartbeat pulsing lasting X seconds to help soothe.",
         icon = Icons.Default.Favorite
+    )
+
+    object BBPlayer : PTSDMode(
+        id = "BB_PLAYER",
+        name = "BB Player",
+        description = "Trigger on squeeze or snap to play synchronized bilateral beats.",
+        icon = Icons.Default.MusicNote
     )
 
     object SleepAssistance : PTSDMode(
