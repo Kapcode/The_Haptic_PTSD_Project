@@ -18,17 +18,17 @@ A primary therapeutic feature where the user activates a comforting, rhythmic "h
 ### Bilateral Beat Player
 Analyze any audio file from your library to generate a custom haptic profile. The app uses advanced signal processing to "feel" the music, providing synchronized tactile feedback that matches the intensity and duration of detected transients. Supports automatic caching for instant re-play.
 
+### Live Haptic Visualizer
+Real-time visual feedback of the haptic engine's output, available both as a dedicated card in the app and as part of a persistent notification. This provides clear confirmation of when the app is generating vibrations, featuring animations for both phone and external controller motors.
+
 ### Intelligent Sleep Assistance (Planned)
 Specialized, rhythmic haptic sessions designed to assist in falling asleep and maintaining sleep quality. The app is evolving to detect signs of tremors or night terrors and respond with gentle tactile interventions.
 
 ### Persistent Customization & Calibration
-The app includes precision calibration tools for both acoustic pressure detection and motion sensitivity. All your preferences—intensity, BPM, and detection thresholds—are automatically saved and remembered.
+The app includes precision calibration tools for both acoustic pressure detection and motion sensitivity. All preferences—intensity, BPM, lead-in/out timing, and detection thresholds—are automatically saved.
 
 ### Privacy First
 Built for the most sensitive contexts, all detection and analysis happen locally on the device. No audio or sensor data is recorded permanently or sent to external servers, ensuring total user confidentiality.
-
-## Information for Treatment Experts
-This project explores the intersection of **Haptic Grounding Therapy** and **Mobile Biosensing**. By providing a consistent, rhythmic tactile stimulus, the app targets the "window of tolerance," aiming to assist users in returning from hyper-arousal to a regulated state without the need for external intervention.
 
 ---
 
@@ -37,7 +37,7 @@ This project explores the intersection of **Haptic Grounding Therapy** and **Mob
 - **Logic:** Kotlin / Coroutines
 - **Sensing:** Acoustic Pressure Detection (sonar-based) & Linear Acceleration (gravity-independent motion)
 - **Background:** Android Foreground Service with WakeLock
-- **Signal Processing:** JTransforms (FFT)
+- **Signal Processing:** JTransforms (FFT) / Adaptive Transient Detection
 - **Persistence**: JSON-based haptic profiles
 
 ## Requirements
@@ -46,6 +46,4 @@ This project explores the intersection of **Haptic Grounding Therapy** and **Mob
 
 ## Future Exploration
 - Bilateral Stimulation: Support for dual-device connectivity via Bluetooth to provide alternating pulses on each arm.
-
-## Ideas
-- **Picture-in-Picture (PiP) Haptic Visualizer:** A real-time visualizer that shows the current intensity of the haptic engine. This would provide clear feedback on when the app is generating vibrations. It should support multiple devices, each with 1-2 motors, to give a comprehensive view of the haptic output.
+- Picture-in-Picture (PiP) Visualizer: Expanding the visualizer to a floating window for continuous feedback while using other apps.

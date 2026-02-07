@@ -28,46 +28,44 @@ This document contains technical details, architectural decisions, and developme
 ### Haptic Feedback Engine (`HapticManager.kt`)
 - **Pattern**: "Lub-dub" heartbeat simulation.
 - **Architecture**: Singleton `object` to ensure unified state between the UI and Background Service.
+- **Live Visualizer State**: Tracks real-time intensity for four virtual motors (Phones L/R, Controllers L/R).
+- **Decay Logic**: Background loop reduces motor intensity over time to create a smooth "glow" effect.
+- **Adjustable Timing**: Supports user-defined "lead-in" and "lead-out" periods for both physical vibration and visual feedback.
 - **Session Management**: Timer-based sessions with auto-stop and "reset-on-trigger" extension logic.
 - **Testing**: `testPulseSequence()` provides a 3-beat burst to allow immediate tuning of BPM and intensity.
+
+## Bilateral Beat Player & Stimulation
+
+### Audio Analysis & Beat Detection
+- **Mechanism**: Two-pass analysis system using adaptive transient detection.
+- **Pass 1**: Scans audio to identify potential beat candidates and determine a dynamic energy threshold.
+- **Pass 2**: Filters candidates based on the threshold to finalize rhythmic timestamps.
+- **Optimization**: Intelligent downsampling (analyzing 1 in 4 samples) significantly reduces CPU load during profile generation.
+- **Background Processing**: Batch analysis handled by `AnalysisService.kt` with persistent progress notifications.
+
+### File Tree Selection UI
+- **Implementation**: Lazy-loading folder/file browser using SAF (Storage Access Framework) URIs.
+- **Auto-loading**: Automatically scans for and loads existing haptic profiles (.json) when a track or profile type is selected.
 
 ## Future Features & Ideas
 
 ### Picture-in-Picture (PiP) Haptic Visualizer
-- **Goal**: Provide clear, real-time visual feedback on when the app is generating vibrations, addressing potential user uncertainty.
-- **UI**: A Picture-in-Picture (PiP) window that can overlay other apps or the home screen.
-- **Visualization**: The visualizer will show the current intensity of the haptic motor(s). This could be represented by bars that animate in height and color based on the intensity value from `HapticManager`.
-- **Multi-device/motor Support**: The design should be flexible enough to support:
-    - A single device with one motor.
-    - A single device with multiple motors (e.g., left/right exciters).
-    - Multiple connected devices (part of the bilateral stimulation goal), each with its own motor visualization.
-
-### Bilateral Beat Player & Stimulation (Planned)
-- **Overview**: A multi-device feature designed for Bilateral Stimulation (BLS) using audio-synchronized haptics across two phones connected via Bluetooth.
-- **Step 1: Audio Analysis & Beat Detection**: Analyze an audio file (e.g., MP3/WAV) to detect rhythmic peaks or transients. Distinguish between Left and Right channel peaks for alternating stimulation.
-- **Step 2: Metadata Creation (.mdi files)**: A custom `.mdi` (Motion Data Interface) file generated alongside the audio to store timestamps and channel mapping (L/R) for each detected beat.
-- **Step 3: Bluetooth Coordination**: Use Bluetooth Classic (SPP) or BLE for low-latency synchronization. A primary phone will play audio and send sync triggers to a secondary phone.
-- **Step 4: Synchronized Playback**: Use a shared reference clock to ensure the audio and haptic pulses remain in phase.
-
+- **Goal**: Floating visual confirmation of haptic activity while using other apps.
+- **Multi-device Support**: Design for visualizing output across synchronized phones/controllers.
 
 ## Software Architecture
 
 ### Logging System (`Logger.kt`)
-- **Levels**: `DEBUG`, `INFO`, `ERROR`.
-- **Persistence**: Currently session-based (in-memory list).
-- **UI Features**: Ordinal-based level filtering and reverse chronological sorting.
+- **Persistence**: Persistent "Log to Logcat" preference saved in `SettingsManager`.
+- **UI Features**: Filterable log history with Logcat mirroring for advanced debugging.
 
 ### Mode Management (`UserFacingModes.kt`)
-- **Selection**: Set-based multi-selection.
-- **Lifecycle**: Modes are reset to empty on fresh launch to ensure intentional activation of physiological interventions.
+- **Lifecycle**: Therapeutic modes (e.g., Active Heartbeat) are intentionally reset on app launch for safety.
 
 ## Persistence (`SettingsManager.kt`)
-- **Scope**: All hardware preferences (Intensity, BPM, Thresholds, Toggles) are persisted.
-- **Exclusion**: Therapeutic Modes (Active Heartbeat, etc.) are NOT persisted for safety.
-
-## Signal Processing Dependencies
-- **JTransforms**: Java-based FFT library for signal processing.
+- **Scope**: Hardware preferences (Intensity, BPM, Timing, Thresholds) are persisted.
+- **Exclusion**: Active modes are NOT persisted.
 
 ## Current Known Issues / Notes
-- **Foreground Service**: Requires `FOREGROUND_SERVICE_MICROPHONE` and `FOREGROUND_SERVICE_SPECIAL_USE` permissions on API 34+.
-- **WakeLock**: Used to ensure sensor processing continues when the screen is dimmed or off during sleep monitoring.
+- **Foreground Service**: Requires `FOREGROUND_SERVICE_SPECIAL_USE` for analysis and microphone permissions for squeeze detection.
+- **WakeLock**: Prevents system sleep during active therapeutic sessions.
