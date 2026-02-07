@@ -26,7 +26,11 @@ object Logger {
     private val _logHistory = MutableStateFlow<List<LogEntry>>(emptyList())
     val logHistory = _logHistory.asStateFlow()
 
-    var logToLogcat = false
+    var logToLogcat: Boolean
+        get() = SettingsManager.logToLogcat
+        set(value) {
+            SettingsManager.logToLogcat = value
+        }
 
     fun log(message: String, level: LogLevel = LogLevel.INFO) {
         _logHistory.value = (_logHistory.value + LogEntry(message, level)).takeLast(1000)

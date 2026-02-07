@@ -11,6 +11,7 @@ import android.os.Build
 import android.provider.DocumentsContract
 import androidx.annotation.RequiresApi
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
@@ -20,6 +21,8 @@ import org.jtransforms.fft.DoubleFFT_1D
 import java.io.InputStream
 import java.nio.charset.Charset
 import java.util.Scanner
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -56,6 +59,18 @@ data class BeatPlayerState(
     val mediaVolume: Float = 1.0f
 )
 
+internal data class BeatCandidate(
+    val timestampMs: Long,
+    val energy: Double,
+    val intensity: Float,
+    val durationMs: Int
+)
+
+private data class PcmChunk(
+    val pcm: ShortArray,
+    val timestampMs: Long
+)
+
 object BeatDetector {
 
     private val _playerState = MutableStateFlow(BeatPlayerState())
@@ -63,10 +78,9 @@ object BeatDetector {
 
     private var mediaPlayer: MediaPlayer? = null
     private var playbackJob: Job? = null
+    private val analysisLock = AtomicBoolean(false)
     
-    private var lastGuitarEnergy = 0.0
-    private var lastBassEnergy = 0.0
-    private var lastDrumEnergy = 0.0
+    private const val ENERGY_HISTORY_SIZE = 43 // ~1 second of audio history
 
     fun init() {
         _playerState.value = _playerState.value.copy(
@@ -137,131 +151,118 @@ object BeatDetector {
         uri: Uri,
         profile: BeatProfile
     ): List<DetectedBeat> = withContext(Dispatchers.Default) {
-        Logger.info("Starting analysis for URI: $uri")
-        _playerState.value = _playerState.value.copy(
-            isAnalyzing = true, 
-            analysisProgress = 0f, 
-            detectedBeats = emptyList()
-        )
+        if (!analysisLock.compareAndSet(false, true)) {
+            Logger.info("Analysis already in progress. Ignoring request.")
+            return@withContext emptyList()
+        }
 
-        val beats = mutableListOf<DetectedBeat>()
+        try {
+            Logger.info("Starting analysis for URI: $uri")
+            _playerState.value = _playerState.value.copy(isAnalyzing = true, analysisProgress = 0f, detectedBeats = emptyList())
+
+            val candidates = performAnalysisPass(context, uri, profile, 0.0)
+            if (candidates.isEmpty()) {
+                Logger.error("Pass 1: No beat candidates found.")
+                _playerState.value = _playerState.value.copy(isAnalyzing = false)
+                return@withContext emptyList()
+            }
+            Logger.info("Pass 1: Found ${candidates.size} potential candidates.")
+            
+            val sortedCandidates = candidates.sortedByDescending { it.energy }
+            val thresholdIndex = (sortedCandidates.size * 0.2).toInt()
+            val dynamicThreshold = sortedCandidates[thresholdIndex].energy
+            Logger.info("Dynamic energy threshold set to: $dynamicThreshold")
+
+            var finalBeats = candidates.filter { it.energy >= dynamicThreshold }
+            Logger.info("Pass 2: Filtered down to ${finalBeats.size} beats.")
+
+            if (finalBeats.isEmpty()) {
+                val fallbackCount = (candidates.size * 0.1).toInt().coerceAtLeast(1)
+                finalBeats = sortedCandidates.take(fallbackCount)
+                Logger.info("Fallback triggered: Taking top $fallbackCount candidates.")
+            }
+
+            val detectedBeats = finalBeats.map { DetectedBeat(it.timestampMs, it.intensity, it.durationMs, 2) }
+            
+            _playerState.value = _playerState.value.copy(detectedBeats = detectedBeats, isAnalyzing = false, analysisProgress = 1f)
+            Logger.info("Analysis complete. Final beat count: ${detectedBeats.size}")
+            return@withContext detectedBeats
+        } finally {
+            analysisLock.set(false)
+        }
+    }
+
+    private suspend fun performAnalysisPass(context: Context, uri: Uri, profile: BeatProfile, energyThreshold: Double): List<BeatCandidate> = withContext(Dispatchers.Default) {
+        val candidates = mutableListOf<BeatCandidate>()
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
+        val energyHistory = mutableListOf<Double>()
+        var lastPeakTimeMs = -500L
+        var lastGuitarEnergy = 0.0
+        var lastBassEnergy = 0.0
 
-        lastGuitarEnergy = 0.0
-        lastBassEnergy = 0.0
-        lastDrumEnergy = 0.0
-        
         try {
-            Logger.debug("Setting extractor data source...")
-            context.contentResolver.openFileDescriptor(uri, "r")?.use { fd ->
-                extractor.setDataSource(fd.fileDescriptor)
-            } ?: run {
-                Logger.error("Failed to open file descriptor for URI.")
-                _playerState.value = _playerState.value.copy(isAnalyzing = false)
-                return@withContext emptyList()
-            }
-
+            context.contentResolver.openFileDescriptor(uri, "r")?.use { extractor.setDataSource(it.fileDescriptor) } ?: return@withContext emptyList()
+            
             val trackIndex = selectAudioTrack(extractor)
-            if (trackIndex < 0) {
-                Logger.error("No audio track found.")
-                _playerState.value = _playerState.value.copy(isAnalyzing = false)
-                return@withContext emptyList()
-            }
+            if (trackIndex < 0) return@withContext emptyList()
 
             val format = extractor.getTrackFormat(trackIndex)
-            val mime = format.getString(MediaFormat.KEY_MIME)
+            val mime = format.getString(MediaFormat.KEY_MIME) ?: return@withContext emptyList()
             val durationUs = format.getLong(MediaFormat.KEY_DURATION)
-            if (mime == null) {
-                Logger.error("MIME type is null.")
-                _playerState.value = _playerState.value.copy(isAnalyzing = false)
-                return@withContext emptyList()
-            }
-            
-            Logger.debug("Track format: $format")
-            
-            codec = MediaCodec.createDecoderByType(mime).also {
-                Logger.debug("Codec created: ${it.name}")
-                it.configure(format, null, null, 0)
-                it.start()
-                Logger.debug("Codec started.")
-            }
 
+            codec = MediaCodec.createDecoderByType(mime).apply {
+                configure(format, null, null, 0)
+                start()
+            }
             extractor.selectTrack(trackIndex)
 
             val info = MediaCodec.BufferInfo()
             var isExtractorDone = false
-            var isDecoderDone = false
-            var lastPeakTimeMs = -500L
-
-            Logger.debug("Starting decoding loop...")
-            while (!isDecoderDone) {
-                if (!isActive) {
-                    Logger.info("Analysis coroutine cancelled.")
-                    break
-                }
-
-                if (!isExtractorDone) {
-                    val inputIndex = codec.dequeueInputBuffer(10000)
-                    if (inputIndex >= 0) {
-                        val inputBuffer = codec.getInputBuffer(inputIndex)!!
-                        val sampleSize = extractor.readSampleData(inputBuffer, 0)
-                        if (sampleSize < 0) {
-                            codec.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                            isExtractorDone = true
-                        } else {
-                            _playerState.value = _playerState.value.copy(analysisProgress = extractor.sampleTime.toFloat() / durationUs.toFloat())
-                            codec.queueInputBuffer(inputIndex, 0, sampleSize, extractor.sampleTime, 0)
-                            extractor.advance()
-                        }
+            
+            while (!isExtractorDone && isActive) {
+                val inputIndex = codec.dequeueInputBuffer(10000)
+                if (inputIndex >= 0) {
+                    val inputBuffer = codec.getInputBuffer(inputIndex)!!
+                    val sampleSize = extractor.readSampleData(inputBuffer, 0)
+                    if (sampleSize < 0) {
+                        codec.queueInputBuffer(inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                        isExtractorDone = true
+                    } else {
+                        val progress = extractor.sampleTime.toFloat() / durationUs.toFloat()
+                        _playerState.value = _playerState.value.copy(analysisProgress = progress)
+                        codec.queueInputBuffer(inputIndex, 0, sampleSize, extractor.sampleTime, 0)
+                        extractor.advance()
                     }
                 }
 
-                val outputIndex = codec.dequeueOutputBuffer(info, 10000)
-                if (outputIndex >= 0) {
-                    if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                        isDecoderDone = true
-                    } else {
+                var outputIndex = codec.dequeueOutputBuffer(info, 10000)
+                while (outputIndex >= 0) {
+                    if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) isExtractorDone = true
+                    
+                    if (info.size > 0) {
                         val outputBuffer = codec.getOutputBuffer(outputIndex)!!
-                        val currentPcm = ShortArray(info.size / 2)
-                        outputBuffer.asShortBuffer().get(currentPcm)
+                        val pcm = ShortArray(info.size / 2)
+                        outputBuffer.asShortBuffer().get(pcm)
                         
-                        val presentationTimeMs = info.presentationTimeUs / 1000
-                        processPcmWindow(currentPcm, presentationTimeMs, format.getInteger(MediaFormat.KEY_SAMPLE_RATE), format.getInteger(MediaFormat.KEY_CHANNEL_COUNT), profile, lastPeakTimeMs)?.let {
-                            beats.add(it)
+                        val result = processPcmWindow(pcm, info.presentationTimeUs / 1000, format, profile, lastPeakTimeMs, energyThreshold, energyHistory, lastGuitarEnergy, lastBassEnergy)
+                        result?.candidate?.let {
+                            candidates.add(it)
                             lastPeakTimeMs = it.timestampMs
                         }
+                        result?.newGuitarEnergy?.let { lastGuitarEnergy = it }
+                        result?.newBassEnergy?.let { lastBassEnergy = it }
                     }
+
                     codec.releaseOutputBuffer(outputIndex, false)
+                    outputIndex = codec.dequeueOutputBuffer(info, 10000)
                 }
             }
-            Logger.debug("Decoding loop finished.")
-
-        } catch (e: Exception) {
-            Logger.error("Analysis Exception: ${e.javaClass.simpleName} - ${e.message}")
-            beats.clear()
         } finally {
-            Logger.debug("Releasing resources...")
-            try {
-                codec?.stop()
-                codec?.release()
-                Logger.debug("Codec released.")
-            } catch (e: Exception) {
-                Logger.error("Error releasing codec: ${e.message}")
-            }
-            try {
-                extractor.release()
-                Logger.debug("Extractor released.")
-            } catch (e: Exception) {
-                Logger.error("Error releasing extractor: ${e.message}")
-            }
+            codec?.stop(); codec?.release(); extractor.release()
         }
-
-        Logger.info("Analysis finished. Found ${beats.size} beats.")
-        _playerState.value = _playerState.value.copy(detectedBeats = beats, isAnalyzing = false)
-        return@withContext beats
+        return@withContext candidates
     }
-
 
     fun playSynchronized(context: Context) {
         val uri = _playerState.value.selectedFileUri ?: return
@@ -367,10 +368,19 @@ object BeatDetector {
         }
         return -1
     }
+    
+    internal data class ProcessResult(
+        val candidate: BeatCandidate?,
+        val newGuitarEnergy: Double? = null,
+        val newBassEnergy: Double? = null
+    )
 
-    private fun processPcmWindow(pcm: ShortArray, timestampMs: Long, sampleRate: Int, channels: Int, profile: BeatProfile, lastPeakTimeMs: Long): DetectedBeat? {
+    private fun processPcmWindow(pcm: ShortArray, timestampMs: Long, format: MediaFormat, profile: BeatProfile, lastPeakTimeMs: Long, energyThreshold: Double, energyHistory: MutableList<Double>, lastGuitarEnergy: Double, lastBassEnergy: Double): ProcessResult? {
+        val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+        val channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+        
         val refractoryPeriod = when (profile) {
-            BeatProfile.GUITAR -> 350L
+            BeatProfile.GUITAR -> 200L
             BeatProfile.BASS -> 400L
             BeatProfile.DRUM -> 150L
             else -> 200L
@@ -378,28 +388,53 @@ object BeatDetector {
         if (timestampMs - lastPeakTimeMs < refractoryPeriod) return null
         
         return when (profile) {
-            BeatProfile.AMPLITUDE -> analyzePeak(pcm, timestampMs)
-            BeatProfile.BASS -> analyzeBassPeak(pcm, timestampMs, sampleRate, channels)
-            BeatProfile.DRUM -> analyzeDrumPeak(pcm, timestampMs, sampleRate, channels)
-            BeatProfile.GUITAR -> analyzeGuitarPeak(pcm, timestampMs, sampleRate, channels)
+            BeatProfile.AMPLITUDE -> ProcessResult(analyzeAmplitude(pcm, timestampMs, channels, energyThreshold, energyHistory))
+            BeatProfile.BASS -> analyzeBassPeak(pcm, timestampMs, sampleRate, channels, energyThreshold, lastBassEnergy)
+            BeatProfile.DRUM -> ProcessResult(analyzeDrumPeak(pcm, timestampMs, channels, energyThreshold, energyHistory))
+            BeatProfile.GUITAR -> analyzeGuitarPeak(pcm, timestampMs, sampleRate, channels, energyThreshold, lastGuitarEnergy)
         }
     }
 
-    private fun analyzePeak(pcm: ShortArray, timestampMs: Long): DetectedBeat? {
-        var maxAmp = 0f
-        for (sample in pcm) {
-            val amp = abs(sample.toInt()) / 32768f
-            if (amp > maxAmp) maxAmp = amp
+    private fun analyzeAmplitude(pcm: ShortArray, timestampMs: Long, channels: Int, energyThreshold: Double, energyHistory: MutableList<Double>): BeatCandidate? {
+        if (pcm.isEmpty()) return null
+        
+        var sum = 0.0
+        val n = pcm.size / channels
+        var samplesProcessed = 0
+        
+        for (i in 0 until n step 4) { 
+            var channelSum = 0.0
+            for (c in 0 until channels) {
+                channelSum += pcm[i * channels + c]
+            }
+            val sample = channelSum / channels
+            sum += sample * sample
+            samplesProcessed++
         }
-        return if (maxAmp > 0.5f) {
-            val intensity = ((maxAmp - 0.5f) / 0.5f * 0.6f + 0.4f).coerceIn(0f, 1f)
-            DetectedBeat(timestampMs, intensity, 100, 2)
-        } else null
+        if(samplesProcessed == 0) return null
+        val currentEnergy = sqrt(sum / samplesProcessed)
+
+        if (energyHistory.size < ENERGY_HISTORY_SIZE) {
+            energyHistory.add(currentEnergy)
+            return null
+        }
+
+        val averageEnergy = energyHistory.average()
+        val energyRatio = if (averageEnergy > 0) currentEnergy / averageEnergy else 0.0
+
+        energyHistory.removeAt(0)
+        energyHistory.add(currentEnergy)
+
+        if (energyRatio > 1.3 && currentEnergy > energyThreshold) {
+            val intensity = ((energyRatio - 1.3) / 1.5).toFloat().coerceIn(0.4f, 1.0f)
+            return BeatCandidate(timestampMs, currentEnergy, intensity, 100)
+        }
+        return null
     }
 
-    private fun analyzeBassPeak(pcm: ShortArray, timestampMs: Long, sampleRate: Int, channels: Int): DetectedBeat? {
+    private fun analyzeBassPeak(pcm: ShortArray, timestampMs: Long, sampleRate: Int, channels: Int, energyThreshold: Double, lastBassEnergy: Double): ProcessResult {
         val n = 512
-        if (pcm.size < n * channels) return null
+        if (pcm.size < n * channels) return ProcessResult(null, newBassEnergy = lastBassEnergy)
         val fft = DoubleFFT_1D(n.toLong())
         val data = DoubleArray(n * 2)
         for (i in 0 until n) {
@@ -418,50 +453,55 @@ object BeatDetector {
         
         val avgEnergy = bassEnergy / 10.0
         val onsetRatio = if (lastBassEnergy > 0) avgEnergy / lastBassEnergy else 2.0
-        val isOnset = onsetRatio > 2.0 && avgEnergy > 60.0
-        lastBassEnergy = avgEnergy
         
-        return if (isOnset) {
+        if (onsetRatio > 2.0 && avgEnergy > energyThreshold) {
             val intensity = ((avgEnergy - 60.0) / 200.0 * 0.5 + 0.5).coerceIn(0.5, 1.0).toFloat()
-            DetectedBeat(timestampMs, intensity, 350, 2)
-        } else null
+            return ProcessResult(BeatCandidate(timestampMs, avgEnergy, intensity, 350), newBassEnergy = avgEnergy)
+        }
+        return ProcessResult(null, newBassEnergy = avgEnergy)
     }
 
-    private fun analyzeDrumPeak(pcm: ShortArray, timestampMs: Long, sampleRate: Int, channels: Int): DetectedBeat? {
-        val n = 512
-        if (pcm.size < n * channels) return null
-        val fft = DoubleFFT_1D(n.toLong())
-        val data = DoubleArray(n * 2)
-        for (i in 0 until n) {
-            var sum = 0.0
-            for (c in 0 until channels) sum += pcm[i * channels + c]
-            data[i] = sum / channels
+    private fun analyzeDrumPeak(pcm: ShortArray, timestampMs: Long, channels: Int, energyThreshold: Double, energyHistory: MutableList<Double>): BeatCandidate? {
+        if (pcm.isEmpty()) return null
+        
+        var sum = 0.0
+        val n = pcm.size / channels
+        var samplesProcessed = 0
+        
+        for (i in 0 until n step 4) {
+            var channelSum = 0.0
+            for (c in 0 until channels) {
+                channelSum += pcm[i * channels + c]
+            }
+            val sample = channelSum / channels
+            sum += sample * sample
+            samplesProcessed++
         }
-        fft.realForward(data)
+        if(samplesProcessed == 0) return null
+        val currentEnergy = sqrt(sum / samplesProcessed)
 
-        var transientEnergy = 0.0
-        val lowBin = (100 * n / sampleRate).coerceAtLeast(1)
-        val highBin = (8000 * n / sampleRate).coerceAtMost(n / 2)
-
-        for (i in lowBin..highBin) {
-            val re = data[2 * i]
-            val im = data[2 * i + 1]
-            transientEnergy += sqrt(re * re + im * im)
+        if (energyHistory.size < ENERGY_HISTORY_SIZE) {
+            energyHistory.add(currentEnergy)
+            return null
         }
 
-        val avgEnergy = transientEnergy / (highBin - lowBin + 1)
-        val onsetRatio = if (lastDrumEnergy > 0) avgEnergy / lastDrumEnergy else 2.0
-        lastDrumEnergy = avgEnergy
+        val averageEnergy = energyHistory.average()
+        val energyRatio = if (averageEnergy > 0) currentEnergy / averageEnergy else 0.0
 
-        return if (onsetRatio > 2.5 && avgEnergy > 30.0) {
-            val intensity = (onsetRatio / 5.0).toFloat().coerceIn(0.6f, 1.0f)
-            DetectedBeat(timestampMs, intensity, 120, 2)
-        } else null
+        energyHistory.removeAt(0)
+        energyHistory.add(currentEnergy)
+
+        if (energyRatio > 1.8 && currentEnergy > energyThreshold) {
+            val intensity = ((energyRatio - 1.8) / 1.5).toFloat().coerceIn(0.5f, 1.0f)
+            return BeatCandidate(timestampMs, currentEnergy, intensity, 120)
+        }
+
+        return null
     }
 
-    private fun analyzeGuitarPeak(pcm: ShortArray, timestampMs: Long, sampleRate: Int, channels: Int): DetectedBeat? {
+    private fun analyzeGuitarPeak(pcm: ShortArray, timestampMs: Long, sampleRate: Int, channels: Int, energyThreshold: Double, lastGuitarEnergy: Double): ProcessResult {
         val n = 512
-        if (pcm.size < n * channels) return null
+        if (pcm.size < n * channels) return ProcessResult(null, newGuitarEnergy = lastGuitarEnergy)
         val fft = DoubleFFT_1D(n.toLong())
         val data = DoubleArray(n * 2)
         for (i in 0 until n) {
@@ -472,8 +512,8 @@ object BeatDetector {
         fft.realForward(data)
         
         var guitarEnergy = 0.0
-        val lowBin = (250 * n / sampleRate).coerceAtLeast(1)
-        val highBin = (3500 * n / sampleRate).coerceAtMost(n / 2)
+        val lowBin = (700 * n / sampleRate).coerceAtLeast(1)
+        val highBin = (3000 * n / sampleRate).coerceAtMost(n / 2)
         
         for (i in lowBin..highBin) {
             val re = data[2 * i]
@@ -482,14 +522,13 @@ object BeatDetector {
         }
         
         val avgEnergy = guitarEnergy / (highBin - lowBin + 1)
-        val onsetRatio = if (lastGuitarEnergy > 0) avgEnergy / lastGuitarEnergy else 2.0
-        val isOnset = onsetRatio > 1.6 && avgEnergy > 15.0
-        lastGuitarEnergy = avgEnergy
+        val onsetRatio = if (lastGuitarEnergy > 0) avgEnergy / lastGuitarEnergy else 1.6
         
-        return if (isOnset) {
+        if (onsetRatio > 1.6 && avgEnergy > energyThreshold) {
             val intensity = ((onsetRatio - 1.6) / 2.0 * 0.5 + 0.5).coerceIn(0.5, 1.0).toFloat()
             val duration = (150 + (avgEnergy * 2)).toInt().coerceAtMost(450)
-            DetectedBeat(timestampMs, intensity, duration, 2)
-        } else null
+            return ProcessResult(BeatCandidate(timestampMs, avgEnergy, intensity, duration), newGuitarEnergy = avgEnergy)
+        }
+        return ProcessResult(null, newGuitarEnergy = avgEnergy)
     }
 }

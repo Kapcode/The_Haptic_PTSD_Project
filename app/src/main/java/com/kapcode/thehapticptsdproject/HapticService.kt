@@ -14,9 +14,11 @@ import android.hardware.SensorManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.widget.RemoteViews
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.combine
 import kotlin.math.sqrt
 
 class HapticService : Service(), SensorEventListener {
@@ -26,6 +28,7 @@ class HapticService : Service(), SensorEventListener {
     private var motionSensor: Sensor? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var visualizerRefreshJob: Job? = null
 
     private var isSqueezeEnabled = false
     private var isShakeEnabled = false
@@ -66,8 +69,31 @@ class HapticService : Service(), SensorEventListener {
         createNotificationChannel()
 
         serviceScope.launch {
-            HapticManager.state.collect { state ->
-                updateNotification(state)
+            combine(HapticManager.state, BeatDetector.playerState) { hState, bState ->
+                hState to bState
+            }.collect { (hState, bState) ->
+                updateNotification(hState, bState)
+                
+                val anyActive = hState.isHeartbeatRunning || bState.isPlaying || hState.isTestRunning || 
+                                hState.phoneLeftIntensity > 0 || hState.phoneRightIntensity > 0 ||
+                                hState.controllerLeftTopIntensity > 0 || hState.controllerLeftBottomIntensity > 0 ||
+                                hState.controllerRightTopIntensity > 0 || hState.controllerRightBottomIntensity > 0
+
+                if (anyActive && visualizerRefreshJob == null) {
+                    startVisualizerRefreshLoop()
+                } else if (!anyActive) {
+                    visualizerRefreshJob?.cancel()
+                    visualizerRefreshJob = null
+                }
+            }
+        }
+    }
+
+    private fun startVisualizerRefreshLoop() {
+        visualizerRefreshJob = serviceScope.launch {
+            while (isActive) {
+                updateNotification(HapticManager.state.value, BeatDetector.playerState.value)
+                delay(50) // High frequency for smooth animation
             }
         }
     }
@@ -81,12 +107,12 @@ class HapticService : Service(), SensorEventListener {
                 
                 acquireWakeLock()
                 startDetection()
-                updateNotification(HapticManager.state.value)
+                updateNotification(HapticManager.state.value, BeatDetector.playerState.value)
             }
             ACTION_UPDATE_MODES -> {
                 isBBPlayerModeActive = intent.getBooleanExtra(EXTRA_BB_PLAYER_ACTIVE, false)
                 isHeartbeatModeActive = intent.getBooleanExtra(EXTRA_HEARTBEAT_ACTIVE, false)
-                updateNotification(HapticManager.state.value)
+                updateNotification(HapticManager.state.value, BeatDetector.playerState.value)
             }
             ACTION_STOP -> {
                 stopSelf()
@@ -95,24 +121,47 @@ class HapticService : Service(), SensorEventListener {
         return START_STICKY
     }
 
-    private fun updateNotification(state: HapticState) {
-        val playerState = BeatDetector.playerState.value
-        
+    private fun updateNotification(hState: HapticState, bState: BeatPlayerState) {
         val title = when {
-            state.isHeartbeatRunning -> "Heartbeat Active"
-            playerState.isPlaying -> "Bilateral Beats Playing"
+            hState.isHeartbeatRunning -> "Heartbeat Active"
+            bState.isPlaying -> "Bilateral Beats Playing"
             else -> "Haptic PTSD Monitoring"
         }
         
         val text = when {
-            state.isHeartbeatRunning -> "Soothe Session: ${state.remainingSeconds}s remaining (${state.bpm} BPM)"
-            playerState.isPlaying -> "Sync Playing: ${playerState.currentTimestampMs/1000}s / ${playerState.totalDurationMs/1000}s"
+            hState.isHeartbeatRunning -> "Soothe Session: ${hState.remainingSeconds}s remaining"
+            bState.isPlaying -> "Sync Playing: ${bState.currentTimestampMs/1000}s / ${bState.totalDurationMs/1000}s"
             else -> {
                 val modes = mutableListOf<String>()
                 if (isHeartbeatModeActive) modes.add("Heartbeat")
                 if (isBBPlayerModeActive) modes.add("BB Player")
                 "Active Modes: ${if (modes.isEmpty()) "Standby" else modes.joinToString(", ")}"
             }
+        }
+
+        val remoteViews = RemoteViews(packageName, R.layout.notification_haptic_visualizer).apply {
+            setTextViewText(R.id.notification_title, title)
+            setTextViewText(R.id.notification_text, text)
+            
+            val minAlpha = 40 
+            val maxAlpha = 255
+            
+            fun getAlpha(intensity: Float) = (minAlpha + (intensity * (maxAlpha - minAlpha))).toInt()
+
+            setInt(R.id.img_phone_left, "setAlpha", getAlpha(hState.phoneLeftIntensity))
+            setInt(R.id.img_phone_right, "setAlpha", getAlpha(hState.phoneRightIntensity))
+            setInt(R.id.img_controller_left_top, "setAlpha", getAlpha(hState.controllerLeftTopIntensity))
+            setInt(R.id.img_controller_left_bottom, "setAlpha", getAlpha(hState.controllerLeftBottomIntensity))
+            setInt(R.id.img_controller_right_top, "setAlpha", getAlpha(hState.controllerRightTopIntensity))
+            setInt(R.id.img_controller_right_bottom, "setAlpha", getAlpha(hState.controllerRightBottomIntensity))
+            
+            setImageViewResource(R.id.img_phone_left, if (hState.phoneLeftIntensity > 0.01f) R.drawable.phone_left_on else R.drawable.phone_left_off)
+            setImageViewResource(R.id.img_phone_right, if (hState.phoneRightIntensity > 0.01f) R.drawable.phone_right_on else R.drawable.phone_right_off)
+            
+            setImageViewResource(R.id.img_controller_left_top, if (hState.controllerLeftTopIntensity > 0.01f) R.drawable.controller_left_on else R.drawable.controller_left_off)
+            setImageViewResource(R.id.img_controller_left_bottom, if (hState.controllerLeftBottomIntensity > 0.01f) R.drawable.controller_left_on else R.drawable.controller_left_off)
+            setImageViewResource(R.id.img_controller_right_top, if (hState.controllerRightTopIntensity > 0.01f) R.drawable.controller_right_on else R.drawable.controller_right_off)
+            setImageViewResource(R.id.img_controller_right_bottom, if (hState.controllerRightBottomIntensity > 0.01f) R.drawable.controller_right_on else R.drawable.controller_right_off)
         }
 
         val intent = Intent(this, MainActivity::class.java).apply {
@@ -124,8 +173,8 @@ class HapticService : Service(), SensorEventListener {
         )
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(title)
-            .setContentText(text)
+            .setCustomContentView(remoteViews)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .setContentIntent(pendingIntent)
