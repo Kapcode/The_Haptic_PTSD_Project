@@ -14,6 +14,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -84,30 +85,31 @@ object BeatDetector {
     private const val ENERGY_HISTORY_SIZE = 43 // ~1 second of audio history
 
     fun init() {
-        _playerState.value = _playerState.value.copy(
+        _playerState.update { it.copy(
             masterIntensity = SettingsManager.beatMaxIntensity,
             mediaVolume = SettingsManager.mediaVolume
-        )
+        ) }
     }
 
     fun updateMasterIntensity(intensity: Float) {
-        _playerState.value = _playerState.value.copy(masterIntensity = intensity)
+        _playerState.update { it.copy(masterIntensity = intensity) }
         SettingsManager.beatMaxIntensity = intensity
     }
     
     fun updateMediaVolume(volume: Float) {
         val coercedVolume = volume.coerceIn(0f, 1f)
-        _playerState.value = _playerState.value.copy(mediaVolume = coercedVolume)
+        _playerState.update { it.copy(mediaVolume = coercedVolume) }
         mediaPlayer?.setVolume(coercedVolume, coercedVolume)
         SettingsManager.mediaVolume = coercedVolume
     }
 
     fun updateSelectedTrack(uri: Uri?, name: String) {
-        _playerState.value = _playerState.value.copy(
+        _playerState.update { it.copy(
             selectedFileUri = uri,
             selectedFileName = name,
-            detectedBeats = emptyList()
-        )
+            detectedBeats = emptyList(),
+            nextBeatIndex = 0
+        ) }
     }
 
     fun findExistingProfile(context: Context, parentUri: Uri, audioFileName: String, profile: BeatProfile): Uri? {
@@ -133,18 +135,34 @@ object BeatDetector {
         return null
     }
 
-    fun loadProfile(context: Context, uri: Uri): List<DetectedBeat>? {
+    fun loadProfile(context: Context, uri: Uri?): List<DetectedBeat>? {
+        if (uri == null) {
+            _playerState.update { it.copy(detectedBeats = emptyList(), nextBeatIndex = 0) }
+            return null
+        }
         return try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
                 val json = Scanner(inputStream).useDelimiter("\\A").next()
                 val profile = Json.decodeFromString<HapticProfile>(json)
-                _playerState.value = _playerState.value.copy(detectedBeats = profile.beats)
+                
+                _playerState.update { state ->
+                    val newNextIndex = findNextBeatIndex(profile.beats, state.currentTimestampMs)
+                    state.copy(
+                        detectedBeats = profile.beats,
+                        nextBeatIndex = newNextIndex
+                    )
+                }
                 profile.beats
             }
         } catch (e: Exception) {
             Logger.error("Load Error: ${e.message}")
             null
         }
+    }
+
+    private fun findNextBeatIndex(beats: List<DetectedBeat>, currentMs: Long): Int {
+        val index = beats.indexOfFirst { it.timestampMs >= currentMs }
+        return if (index == -1) beats.size else index
     }
 
     suspend fun analyzeAudioUri(
@@ -157,7 +175,7 @@ object BeatDetector {
             return@withContext emptyList()
         }
 
-        _playerState.value = _playerState.value.copy(isAnalyzing = true, analysisProgress = 0f, detectedBeats = emptyList())
+        _playerState.update { it.copy(isAnalyzing = true, analysisProgress = 0f, detectedBeats = emptyList()) }
         analysisJob = currentCoroutineContext()[Job]
         
         try {
@@ -185,7 +203,13 @@ object BeatDetector {
 
             val detectedBeats = finalBeats.map { DetectedBeat(it.timestampMs, it.intensity, it.durationMs, 2) }
             
-            _playerState.value = _playerState.value.copy(detectedBeats = detectedBeats, analysisProgress = 1f)
+            _playerState.update { state ->
+                state.copy(
+                    detectedBeats = detectedBeats, 
+                    analysisProgress = 1f,
+                    nextBeatIndex = if (state.isPlaying) findNextBeatIndex(detectedBeats, state.currentTimestampMs) else 0
+                )
+            }
             Logger.info("Analysis complete. Final beat count: ${detectedBeats.size}")
             return@withContext detectedBeats
         } catch (e: CancellationException) {
@@ -195,7 +219,7 @@ object BeatDetector {
             Logger.error("Analysis Error: ${e.message}")
             return@withContext emptyList()
         } finally {
-            _playerState.value = _playerState.value.copy(isAnalyzing = false)
+            _playerState.update { it.copy(isAnalyzing = false) }
             analysisLock.set(false)
             analysisJob = null
         }
@@ -204,7 +228,7 @@ object BeatDetector {
     fun cancelAnalysis() {
         analysisJob?.cancel()
         analysisLock.set(false)
-        _playerState.value = _playerState.value.copy(isAnalyzing = false)
+        _playerState.update { it.copy(isAnalyzing = false) }
     }
 
     private suspend fun performAnalysisPass(context: Context, uri: Uri, profile: BeatProfile, energyThreshold: Double): List<BeatCandidate> = withContext(Dispatchers.Default) {
@@ -245,7 +269,7 @@ object BeatDetector {
                         isExtractorDone = true
                     } else {
                         val progress = extractor.sampleTime.toFloat() / durationUs.toFloat()
-                        _playerState.value = _playerState.value.copy(analysisProgress = progress)
+                        _playerState.update { it.copy(analysisProgress = progress) }
                         codec.queueInputBuffer(inputIndex, 0, sampleSize, extractor.sampleTime, 0)
                         extractor.advance()
                     }
@@ -281,8 +305,7 @@ object BeatDetector {
 
     fun playSynchronized(context: Context) {
         val uri = _playerState.value.selectedFileUri ?: return
-        val beats = _playerState.value.detectedBeats
-        if (beats.isEmpty()) return
+        if (_playerState.value.detectedBeats.isEmpty()) return
 
         stopPlayback()
         
@@ -300,25 +323,35 @@ object BeatDetector {
             start()
         }
 
-        _playerState.value = _playerState.value.copy(
+        _playerState.update { it.copy(
             isPlaying = true,
             totalDurationMs = mediaPlayer?.duration?.toLong() ?: 0L,
             nextBeatIndex = 0
-        )
+        ) }
 
         playbackJob = CoroutineScope(Dispatchers.Default).launch {
             while (mediaPlayer?.isPlaying == true) {
                 val currentPos = mediaPlayer?.currentPosition?.toLong() ?: 0L
-                _playerState.value = _playerState.value.copy(currentTimestampMs = currentPos)
-
-                val nextIndex = _playerState.value.nextBeatIndex
-                if (nextIndex < beats.size) {
-                    val beat = beats[nextIndex]
-                    if (currentPos >= beat.timestampMs) {
-                        triggerBeatHaptic(beat)
-                        _playerState.value = _playerState.value.copy(nextBeatIndex = nextIndex + 1)
+                
+                var beatToTrigger: DetectedBeat? = null
+                
+                _playerState.update { state ->
+                    val nextIndex = state.nextBeatIndex
+                    if (nextIndex < state.detectedBeats.size) {
+                        val beat = state.detectedBeats[nextIndex]
+                        if (currentPos >= beat.timestampMs) {
+                            beatToTrigger = beat
+                            state.copy(currentTimestampMs = currentPos, nextBeatIndex = nextIndex + 1)
+                        } else {
+                            state.copy(currentTimestampMs = currentPos)
+                        }
+                    } else {
+                        state.copy(currentTimestampMs = currentPos)
                     }
                 }
+                
+                beatToTrigger?.let { triggerBeatHaptic(it) }
+                
                 delay(5)
             }
             stopPlayback()
@@ -340,7 +373,7 @@ object BeatDetector {
         mediaPlayer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null
-        _playerState.value = _playerState.value.copy(isPlaying = false)
+        _playerState.update { it.copy(isPlaying = false) }
     }
 
     fun saveProfile(context: Context, parentTreeUri: Uri, audioFileName: String, profile: BeatProfile, beats: List<DetectedBeat>) {

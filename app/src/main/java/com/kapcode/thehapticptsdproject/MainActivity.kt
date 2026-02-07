@@ -411,9 +411,7 @@ fun BeatPlayerCard() {
             val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
             if (rootUri != null) {
                 val existingProfileUri = BeatDetector.findExistingProfile(context, rootUri, playerState.selectedFileName, selectedProfile)
-                if (existingProfileUri != null) {
-                    BeatDetector.loadProfile(context, existingProfileUri)
-                }
+                BeatDetector.loadProfile(context, existingProfileUri)
             }
         }
     }
@@ -1216,8 +1214,7 @@ fun SectionCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+                horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge,
