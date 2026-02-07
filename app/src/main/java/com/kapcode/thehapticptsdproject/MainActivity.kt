@@ -8,8 +8,8 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
 import android.provider.Settings
@@ -18,7 +18,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -35,29 +34,28 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.kapcode.thehapticptsdproject.ui.theme.TheHapticPTSDProjectTheme
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var squeezeDetector: SqueezeDetector
 
-    // State for switches and sensitivity (initialized from SettingsManager)
     private var isSqueezeEnabled by mutableStateOf(false)
     private var isShakeEnabled by mutableStateOf(false)
     private var internalShakeThreshold by mutableStateOf(15f)
@@ -68,7 +66,7 @@ class MainActivity : ComponentActivity() {
                 Logger.info("Permissions granted.")
                 handleDetectionStateChange(isModeActiveInUI())
             } else {
-                Logger.error("Permissions denied.")
+                Logger.error("Permissions granted was false.")
             }
         }
 
@@ -88,7 +86,6 @@ class MainActivity : ComponentActivity() {
         HapticManager.updateBpm(SettingsManager.bpm)
         HapticManager.updateSessionDuration(SettingsManager.sessionDurationSeconds)
 
-        // Local detector for calibration UI
         squeezeDetector = SqueezeDetector {}
         squeezeDetector.setSqueezeThreshold(SettingsManager.squeezeThreshold.toDouble())
 
@@ -202,7 +199,7 @@ fun MainScreen(
             TopAppBar(
                 title = { Text("The Haptic PTSD Project") },
                 navigationIcon = {
-                    IconButton(onClick = { /* TODO: Open drawer */ }) {
+                    IconButton(onClick = { /* Drawer toggle */ }) {
                         Icon(imageVector = Icons.Default.Menu, contentDescription = "Menu")
                     }
                 },
@@ -226,10 +223,8 @@ fun MainScreen(
                     val currentModes = modeState.activeModes.toMutableSet()
                     if (mode in currentModes) {
                         currentModes.remove(mode)
-                        Logger.info("${mode.name} deactivated.")
                     } else {
                         currentModes.add(mode)
-                        Logger.info("${mode.name} activated.")
                     }
                     modeState = modeState.copy(activeModes = currentModes)
                 }
@@ -246,10 +241,6 @@ fun MainScreen(
             HapticControlCard()
             Spacer(modifier = Modifier.height(16.dp))
             MediaFoldersCard()
-            Spacer(modifier = Modifier.height(16.dp))
-            SectionCard(title = "Alarm Settings") {
-                Text("Configure triggers and wake-up alerts.")
-            }
             Spacer(modifier = Modifier.height(16.dp))
             LoggerCard()
             Spacer(modifier = Modifier.height(16.dp))
@@ -269,70 +260,26 @@ fun HapticVisualizerCard() {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left Phone (Outside)
-            VisualizerIcon(
-                onRes = R.drawable.phone_left_on,
-                offRes = R.drawable.phone_left_off,
-                intensity = hState.phoneLeftIntensity,
-                label = "Phone L"
-            )
-
-            // Left Controller (Inside)
+            VisualizerIcon(R.drawable.phone_left_on, R.drawable.phone_left_off, hState.phoneLeftIntensity, "Phone L")
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                VisualizerIcon(
-                    onRes = R.drawable.controller_left_on,
-                    offRes = R.drawable.controller_left_off,
-                    intensity = hState.controllerLeftTopIntensity,
-                    size = 32.dp
-                )
-                VisualizerIcon(
-                    onRes = R.drawable.controller_left_on,
-                    offRes = R.drawable.controller_left_off,
-                    intensity = hState.controllerLeftBottomIntensity,
-                    size = 32.dp
-                )
+                VisualizerIcon(R.drawable.controller_left_on, R.drawable.controller_left_off, hState.controllerLeftTopIntensity, size = 32.dp)
+                VisualizerIcon(R.drawable.controller_left_on, R.drawable.controller_left_off, hState.controllerLeftBottomIntensity, size = 32.dp)
                 Text("Ctrl L", style = MaterialTheme.typography.labelSmall)
             }
-
-            // Right Controller (Inside)
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                VisualizerIcon(
-                    onRes = R.drawable.controller_right_on,
-                    offRes = R.drawable.controller_right_off,
-                    intensity = hState.controllerRightTopIntensity,
-                    size = 32.dp
-                )
-                VisualizerIcon(
-                    onRes = R.drawable.controller_right_on,
-                    offRes = R.drawable.controller_right_off,
-                    intensity = hState.controllerRightBottomIntensity,
-                    size = 32.dp
-                )
+                VisualizerIcon(R.drawable.controller_right_on, R.drawable.controller_right_off, hState.controllerRightTopIntensity, size = 32.dp)
+                VisualizerIcon(R.drawable.controller_right_on, R.drawable.controller_right_off, hState.controllerRightBottomIntensity, size = 32.dp)
                 Text("Ctrl R", style = MaterialTheme.typography.labelSmall)
             }
-
-            // Right Phone (Outside)
-            VisualizerIcon(
-                onRes = R.drawable.phone_right_on,
-                offRes = R.drawable.phone_right_off,
-                intensity = hState.phoneRightIntensity,
-                label = "Phone R"
-            )
+            VisualizerIcon(R.drawable.phone_right_on, R.drawable.phone_right_off, hState.phoneRightIntensity, "Phone R")
         }
     }
 }
 
 @Composable
-fun VisualizerIcon(
-    onRes: Int,
-    offRes: Int,
-    intensity: Float,
-    label: String? = null,
-    size: androidx.compose.ui.unit.Dp = 48.dp
-) {
+fun VisualizerIcon(onRes: Int, offRes: Int, intensity: Float, label: String? = null, size: androidx.compose.ui.unit.Dp = 48.dp) {
     val alpha = 0.2f + (intensity * 0.8f)
     val color = if (intensity > 0.01f) MaterialTheme.colorScheme.primary else Color.Gray
-    
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Image(
             painter = painterResource(id = if (intensity > 0.01f) onRes else offRes),
@@ -341,9 +288,7 @@ fun VisualizerIcon(
             alpha = alpha,
             colorFilter = ColorFilter.tint(color)
         )
-        if (label != null) {
-            Text(label, style = MaterialTheme.typography.labelSmall)
-        }
+        if (label != null) Text(label, style = MaterialTheme.typography.labelSmall)
     }
 }
 
@@ -362,9 +307,11 @@ fun BeatPlayerCard() {
     if (showAnalysisDialog) {
         BackgroundAnalysisDialog(
             onDismiss = { showAnalysisDialog = false },
-            onStart = { folders, profiles ->
+            onStart = { files, profiles ->
                 val intent = Intent(context, AnalysisService::class.java).apply {
-                    putStringArrayListExtra(AnalysisService.EXTRA_FOLDER_URIS, ArrayList(folders.map { it.toString() }))
+                    putStringArrayListExtra(AnalysisService.EXTRA_FILE_URIS, ArrayList(files.map { it.first.toString() }))
+                    putStringArrayListExtra(AnalysisService.EXTRA_FILE_NAMES, ArrayList(files.map { it.second }))
+                    putStringArrayListExtra(AnalysisService.EXTRA_PARENT_URIS, ArrayList(files.map { it.third.toString() }))
                     putStringArrayListExtra(AnalysisService.EXTRA_PROFILES, ArrayList(profiles.map { it.name }))
                 }
                 ContextCompat.startForegroundService(context, intent)
@@ -373,33 +320,13 @@ fun BeatPlayerCard() {
         )
     }
 
-    LaunchedEffect(expandedFolderUri, selectedProfile) {
+    LaunchedEffect(expandedFolderUri) {
         val uri = expandedFolderUri
         if (uri != null) {
-            val files = mutableListOf<Pair<String, Uri>>()
-            try {
-                val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-                    uri,
-                    DocumentsContract.getTreeDocumentId(uri)
-                )
-                context.contentResolver.query(
-                    childrenUri,
-                    arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_MIME_TYPE),
-                    null, null, null
-                )?.use { cursor ->
-                    while (cursor.moveToNext()) {
-                        val name = cursor.getString(0)
-                        val id = cursor.getString(1)
-                        val mime = cursor.getString(2)
-                        if (mime.startsWith("audio/")) {
-                            files.add(name to DocumentsContract.buildDocumentUriUsingTree(uri, id))
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Logger.error("Error loading files from folder: ${e.message}")
+            withContext(Dispatchers.IO) {
+                val files = getAudioFiles(context, uri)
+                filesInExpandedFolder = files.sortedBy { it.first }
             }
-            filesInExpandedFolder = files.sortedBy { it.first }
         } else {
             filesInExpandedFolder = emptyList()
         }
@@ -425,33 +352,19 @@ fun BeatPlayerCard() {
         }
     ) {
         Column {
-            if (folderUris.isEmpty()) {
-                Text("No media folders authorized. Add one below.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-            }
             folderUris.forEach { uriString ->
                 val folderUri = Uri.parse(uriString)
                 val isExpanded = expandedFolderUri == folderUri
-                
-                FolderItem(
-                    folderUri = folderUri,
-                    isExpanded = isExpanded,
-                    onClick = {
-                        expandedFolderUri = if (isExpanded) null else folderUri
-                    }
-                )
-
+                FolderItem(folderUri, isExpanded) { expandedFolderUri = if (isExpanded) null else folderUri }
                 AnimatedVisibility(visible = isExpanded) {
                     Column(modifier = Modifier.padding(start = 16.dp)) {
                         filesInExpandedFolder.forEach { (name, uri) ->
                             val isAnalyzed = remember(name, selectedProfile) {
                                 BeatDetector.findExistingProfile(context, folderUri, name, selectedProfile) != null
                             }
-                            FileItem(
-                                name = name,
-                                isAnalyzed = isAnalyzed,
-                                isSelected = playerState.selectedFileUri == uri,
-                                onClick = { BeatDetector.updateSelectedTrack(uri, name) }
-                            )
+                            FileItem(name, isAnalyzed, playerState.selectedFileUri == uri) { 
+                                BeatDetector.updateSelectedTrack(uri, name) 
+                            }
                         }
                     }
                 }
@@ -461,55 +374,50 @@ fun BeatPlayerCard() {
             Spacer(modifier = Modifier.height(16.dp))
 
             Box {
-                var expandedProfiles by remember { mutableStateOf(false) }
-                OutlinedButton(onClick = { expandedProfiles = true }, modifier = Modifier.fillMaxWidth()) {
+                var expanded by remember { mutableStateOf(false) }
+                OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Profile: ${selectedProfile.name}")
                     Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                 }
-                DropdownMenu(expanded = expandedProfiles, onDismissRequest = { expandedProfiles = false }) {
-                    BeatProfile.entries.forEach { profile ->
-                        DropdownMenuItem(
-                            text = { Text(profile.name) },
-                            onClick = {
-                                selectedProfile = profile
-                                expandedProfiles = false
-                            }
-                        )
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    BeatProfile.values().forEach { profile ->
+                        DropdownMenuItem(text = { Text(profile.name) }, onClick = {
+                            selectedProfile = profile
+                            expanded = false
+                        })
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            
             val masterIntensity = playerState.masterIntensity
-            Text("Master Max Haptics: ${(masterIntensity * 100).toInt()}%")
+            Text("Max Haptic Intensity: ${(masterIntensity * 100).toInt()}%")
             Slider(value = masterIntensity, onValueChange = { BeatDetector.updateMasterIntensity(it) })
 
             Spacer(modifier = Modifier.height(8.dp))
-            
-            val mediaVolume = playerState.mediaVolume
-            Text("Media Volume: ${(mediaVolume * 100).toInt()}%")
-            Slider(value = mediaVolume, onValueChange = { BeatDetector.updateMediaVolume(it) })
+            Text("Media Volume: ${(playerState.mediaVolume * 100).toInt()}%")
+            Slider(value = playerState.mediaVolume, onValueChange = { BeatDetector.updateMediaVolume(it) })
 
             Spacer(modifier = Modifier.height(16.dp))
 
             if (playerState.isAnalyzing) {
                 Column {
-                    Text("Analyzing beats: ${(playerState.analysisProgress * 100).toInt()}%")
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Task ${playerState.analysisTaskProgress}", style = MaterialTheme.typography.titleSmall)
+                        if (playerState.analysisFileDuration.isNotEmpty()) {
+                            Text("Cur: ${playerState.analysisFileDuration}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        }
+                    }
+                    if (playerState.analysisTotalRemainingMs > 0) {
+                        val totalSecs = playerState.analysisTotalRemainingMs / 1000
+                        val mins = totalSecs / 60
+                        val secs = totalSecs % 60
+                        Text("Total Audio Left: ${mins}m ${secs}s", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Text("Current File: ${(playerState.analysisProgress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
                     LinearProgressIndicator(progress = { playerState.analysisProgress }, modifier = Modifier.fillMaxWidth())
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            Logger.info("Cancelling analysis...")
-                            val intent = Intent(context, AnalysisService::class.java).apply {
-                                action = AnalysisService.ACTION_CANCEL
-                            }
-                            context.startService(intent)
-                            BeatDetector.cancelAnalysis()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    ) {
+                    Button(onClick = { BeatDetector.cancelAnalysis() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
                         Text("Cancel Analysis")
                     }
                 }
@@ -517,125 +425,75 @@ fun BeatPlayerCard() {
                 Button(
                     onClick = {
                         val uri = playerState.selectedFileUri
-                        if (uri != null) {
-                            val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
-                            if (rootUri != null) {
-                                scope.launch {
-                                    val result = BeatDetector.analyzeAudioUri(context, uri, selectedProfile)
-                                    if (result.isNotEmpty()) {
-                                        BeatDetector.saveProfile(context, rootUri, playerState.selectedFileName, selectedProfile, result)
-                                    }
-                                }
+                        val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
+                        if (uri != null && rootUri != null) {
+                            scope.launch {
+                                val result = BeatDetector.analyzeAudioUri(context, uri, selectedProfile)
+                                if (result.isNotEmpty()) BeatDetector.saveProfile(context, rootUri, playerState.selectedFileName, selectedProfile, result)
                             }
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = playerState.selectedFileUri != null && !playerState.isPlaying
-                ) {
-                    Text("Analyze Audio")
-                }
+                ) { Text("Analyze Audio") }
             }
 
             if (playerState.detectedBeats.isNotEmpty() || playerState.isPlaying) {
                 if (playerState.isPlaying) {
                     val progress = if (playerState.totalDurationMs > 0) playerState.currentTimestampMs.toFloat() / playerState.totalDurationMs.toFloat() else 0f
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Playing: ${(playerState.currentTimestampMs/1000)}s / ${(playerState.totalDurationMs/1000)}s", style = MaterialTheme.typography.bodySmall)
+                        Text("Playing: ${(playerState.currentTimestampMs/1000)}s / ${(playerState.totalDurationMs/1000)}s")
                         LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
-                        Spacer(modifier = Modifier.height(8.dp))
                         Button(onClick = { BeatDetector.stopPlayback() }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error), modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.Stop, contentDescription = null)
-                            Text("Stop Playback")
+                            Icon(Icons.Default.Stop, contentDescription = null); Text("Stop Playback")
                         }
                     }
                 } else {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("${playerState.detectedBeats.size} beats ready", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                        Card(
-                            modifier = Modifier.weight(1f).padding(horizontal = 4.dp).combinedClickable(
-                                onClick = { 
-                                    val intent = Intent(context, HapticService::class.java).apply { action = HapticService.ACTION_START }
-                                    ContextCompat.startForegroundService(context, intent)
-                                    BeatDetector.playSynchronized(context) 
-                                },
-                                onLongClick = {
-                                    val uri = playerState.selectedFileUri
-                                    val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
-                                    if (uri != null && rootUri != null) {
-                                        scope.launch {
-                                            val result = BeatDetector.analyzeAudioUri(context, uri, selectedProfile)
-                                            if (result.isNotEmpty()) {
-                                                BeatDetector.saveProfile(context, rootUri, playerState.selectedFileName, selectedProfile, result)
-                                            }
-                                        }
-                                    }
-                                }
-                            ),
-                            shape = ButtonDefaults.shape,
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
-                        ) {
-                            Row(modifier = Modifier.padding(ButtonDefaults.ContentPadding).fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                                Text("Play (Hold to Refresh)")
-                            }
-                        }
-                    }
+                    Button(
+                        onClick = { 
+                            val intent = Intent(context, HapticService::class.java).apply { action = HapticService.ACTION_START }
+                            ContextCompat.startForegroundService(context, intent)
+                            BeatDetector.playSynchronized(context) 
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Icon(Icons.Default.PlayArrow, contentDescription = null); Text("Play Synchronized") }
                 }
             }
         }
     }
 }
 
+data class AnalysisFile(val uri: Uri, val name: String, val parentUri: Uri, val durationMs: Long = 0)
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun BackgroundAnalysisDialog(
-    onDismiss: () -> Unit,
-    onStart: (Set<Uri>, Set<BeatProfile>) -> Unit
-) {
+fun BackgroundAnalysisDialog(onDismiss: () -> Unit, onStart: (List<Triple<Uri, String, Uri>>, Set<BeatProfile>) -> Unit) {
     val context = LocalContext.current
     val folderUris = SettingsManager.authorizedFolderUris.map { Uri.parse(it) }
-    var selectedFolders by remember { mutableStateOf(setOf<Uri>()) }
-    var selectedProfiles by remember { mutableStateOf(setOf<BeatProfile>()) }
-    
-    // Status maps: Folder/Profile -> IsFullyAnalyzed
-    var folderStatus by remember { mutableStateOf(mapOf<Uri, Boolean>()) }
-    var profileStatus by remember { mutableStateOf(mapOf<BeatProfile, Boolean>()) }
+    var allFiles by remember { mutableStateOf<List<AnalysisFile>>(emptyList()) }
+    var selectedFileUris by remember { mutableStateOf(setOf<Uri>()) }
+    var selectedProfiles by remember { mutableStateOf(BeatProfile.values().toSet()) }
     var isScanning by remember { mutableStateOf(true) }
+    var analyzedMap by remember { mutableStateOf<Map<Pair<Uri, BeatProfile>, Boolean>>(emptyMap()) }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
-            val fStatus = mutableMapOf<Uri, Boolean>()
-            folderUris.forEach { uri ->
-                val files = getAudioFiles(context, uri)
-                if (files.isEmpty()) {
-                    fStatus[uri] = true // Empty is "done"
-                } else {
-                    // Folder is analyzed if ALL its files have at least one profile
-                    val allAnalyzed = files.all { (name, _) ->
-                        BeatProfile.entries.any { profile ->
-                            BeatDetector.findExistingProfile(context, uri, name, profile) != null
-                        }
-                    }
-                    fStatus[uri] = allAnalyzed
+            val files = mutableListOf<AnalysisFile>()
+            folderUris.forEach { files.addAll(getAudioFilesWithDetails(context, it)) }
+            
+            val statusMap = mutableMapOf<Pair<Uri, BeatProfile>, Boolean>()
+            files.forEach { file ->
+                BeatProfile.values().forEach { profile ->
+                    statusMap[file.uri to profile] = BeatDetector.findExistingProfile(context, file.parentUri, file.name, profile) != null
                 }
             }
             
-            val pStatus = mutableMapOf<BeatProfile, Boolean>()
-            // Profiles status based on all authorized files
-            BeatProfile.entries.forEach { profile ->
-                pStatus[profile] = folderUris.all { folderUri ->
-                    getAudioFiles(context, folderUri).all { (name, _) ->
-                        BeatDetector.findExistingProfile(context, folderUri, name, profile) != null
-                    }
-                }
-            }
-
             withContext(Dispatchers.Main) {
-                folderStatus = fStatus
-                profileStatus = pStatus
-                // Default selection: everything not fully analyzed
-                selectedFolders = fStatus.filter { !it.value }.keys
-                selectedProfiles = pStatus.filter { !it.value }.keys
+                allFiles = files
+                analyzedMap = statusMap
+                selectedFileUris = files.filter { file ->
+                    !BeatProfile.values().all { profile -> statusMap[file.uri to profile] == true }
+                }.map { it.uri }.toSet()
                 isScanning = false
             }
         }
@@ -643,490 +501,150 @@ fun BackgroundAnalysisDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Background Analysis") },
+        modifier = Modifier.fillMaxWidth(0.95f),
+        title = { Text("Background Batch Analysis") },
         text = {
             if (isScanning) {
-                Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             } else {
-                Column {
-                    Text(
-                        "⚠️ This process will take a significant amount of time depending on library size. It will run in the background via notification.",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    )
-
-                    // Legend
-                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.Center) {
-                        Text("Legend: ", style = MaterialTheme.typography.labelSmall)
-                        Text("Analyzed", color = Color(0xFF4CAF50), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                        Text(" | ", style = MaterialTheme.typography.labelSmall)
-                        Text("Missing", color = Color(0xFFE57373), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    }
-
-                    Text("Select folders to analyze:", style = MaterialTheme.typography.titleMedium)
-                    folderUris.forEach { folderUri ->
-                        val isAnalyzed = folderStatus[folderUri] ?: false
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectedFolders = if (folderUri in selectedFolders) selectedFolders - folderUri else selectedFolders + folderUri
-                                }
-                                .padding(vertical = 2.dp)
-                        ) {
-                            Checkbox(checked = folderUri in selectedFolders, onCheckedChange = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = folderUri.path?.substringAfterLast(':') ?: "Folder",
-                                color = if (isAnalyzed) Color(0xFF4CAF50) else Color(0xFFE57373),
-                                fontSize = 14.sp
+                Column(modifier = Modifier.fillMaxHeight(0.85f)) {
+                    Text("Select tracks and profiles. Red tracks are long (> 5m) and take significantly more processing time.", style = MaterialTheme.typography.bodySmall)
+                    
+                    Text("Profiles:", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        BeatProfile.values().forEach { profile ->
+                            FilterChip(
+                                selected = profile in selectedProfiles,
+                                onClick = { selectedProfiles = if (profile in selectedProfiles) selectedProfiles - profile else selectedProfiles + profile },
+                                label = { Text(profile.name) }
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Tracks (${selectedFileUris.size}/${allFiles.size}):", style = MaterialTheme.typography.titleSmall)
+                        Row {
+                            TextButton(onClick = { selectedFileUris = allFiles.map { it.uri }.toSet() }) { Text("All", fontSize = 10.sp) }
+                            TextButton(onClick = { selectedFileUris = emptySet() }) { Text("None", fontSize = 10.sp) }
+                            TextButton(onClick = { selectedFileUris = allFiles.filter { it.durationMs < 300000 }.map { it.uri }.toSet() }) { Text("Skip Long", fontSize = 10.sp) }
+                        }
+                    }
 
-                    Text("Select profiles to generate:", style = MaterialTheme.typography.titleMedium)
-                    BeatProfile.entries.forEach { profile ->
-                        val isAnalyzed = profileStatus[profile] ?: false
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectedProfiles = if (profile in selectedProfiles) selectedProfiles - profile else selectedProfiles + profile
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        items(allFiles) { file ->
+                            val isDone = selectedProfiles.isNotEmpty() && selectedProfiles.all { analyzedMap[file.uri to it] == true }
+                            val isLong = file.durationMs > 300000
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable {
+                                selectedFileUris = if (file.uri in selectedFileUris) selectedFileUris - file.uri else selectedFileUris + file.uri
+                            }.padding(vertical = 4.dp)) {
+                                Checkbox(checked = file.uri in selectedFileUris, onCheckedChange = null)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = file.name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = if (isDone) Color(0xFF4CAF50) else if (isLong) Color.Red else Color.Unspecified
+                                    )
+                                    if (file.durationMs > 0) {
+                                        Text("${file.durationMs/60000}m ${ (file.durationMs%60000)/1000 }s", style = MaterialTheme.typography.labelSmall, color = if (isDone) Color(0xFF4CAF50) else if (isLong) Color.Red else Color.Gray)
+                                    } else {
+                                        Text("Duration unknown", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                    }
                                 }
-                                .padding(vertical = 2.dp)
-                        ) {
-                            Checkbox(checked = profile in selectedProfiles, onCheckedChange = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = profile.name,
-                                color = if (isAnalyzed) Color(0xFF4CAF50) else Color(0xFFE57373),
-                                fontSize = 14.sp
-                            )
+                                if (isDone) Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(16.dp))
+                            }
                         }
                     }
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = { onStart(selectedFolders, selectedProfiles) },
-                enabled = selectedFolders.isNotEmpty() && selectedProfiles.isNotEmpty()
-            ) {
-                Text("Start")
+            Button(onClick = {
+                val selected = allFiles.filter { it.uri in selectedFileUris }.map { Triple(it.uri, it.name, it.parentUri) }
+                onStart(selected, selectedProfiles)
+            }, enabled = selectedFileUris.isNotEmpty() && selectedProfiles.isNotEmpty()) {
+                Text("Start (${selectedFileUris.size * selectedProfiles.size} Tasks)")
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
 
-// Helper to avoid duplicate code
-private fun getAudioFiles(context: Context, folderUri: Uri): List<Pair<String, Uri>> {
-    val files = mutableListOf<Pair<String, Uri>>()
+private fun getAudioFilesWithDetails(context: Context, folderUri: Uri): List<AnalysisFile> {
+    val files = mutableListOf<AnalysisFile>()
+    val retriever = MediaMetadataRetriever()
     try {
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-            folderUri,
-            DocumentsContract.getTreeDocumentId(folderUri)
+        val rootDocId = DocumentsContract.getTreeDocumentId(folderUri)
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folderUri, rootDocId)
+        
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            "duration"
         )
-        context.contentResolver.query(
-            childrenUri,
-            arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_MIME_TYPE),
-            null, null, null
-        )?.use { cursor ->
+
+        context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
             while (cursor.moveToNext()) {
                 val name = cursor.getString(0)
                 val id = cursor.getString(1)
                 val mime = cursor.getString(2)
-                if (mime.startsWith("audio/")) {
-                    files.add(name to DocumentsContract.buildDocumentUriUsingTree(folderUri, id))
+                if (mime?.startsWith("audio/") == true) {
+                    var duration = 0L
+                    
+                    val durIdx = cursor.getColumnIndex("duration")
+                    if (durIdx != -1) duration = cursor.getLong(durIdx)
+                    
+                    val fileUri = DocumentsContract.buildDocumentUriUsingTree(folderUri, id)
+
+                    if (duration == 0L) {
+                        try {
+                            context.contentResolver.openFileDescriptor(fileUri, "r")?.use { pfd ->
+                                retriever.setDataSource(pfd.fileDescriptor)
+                                val durStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                duration = durStr?.toLong() ?: 0L
+                            }
+                        } catch (e: Exception) { }
+                    }
+
+                    files.add(AnalysisFile(fileUri, name, folderUri, duration))
                 }
             }
         }
-    } catch (e: Exception) { }
+    } catch (e: Exception) {
+        Logger.error("Error fetching audio details: ${e.message}")
+    } finally {
+        try { retriever.release() } catch (e: Exception) {}
+    }
     return files
 }
 
-@Composable
-fun FolderItem(folderUri: Uri, isExpanded: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = if (isExpanded) Icons.Default.FolderOpen else Icons.Default.Folder,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = folderUri.path?.substringAfterLast(':') ?: "Folder",
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f)
-        )
-        Icon(
-            imageVector = if (isExpanded) Icons.Default.ArrowDropDown else Icons.Default.ArrowRight,
-            contentDescription = "Expand or collapse folder"
-        )
-    }
-}
-
-@Composable
-fun FileItem(name: String, isAnalyzed: Boolean, isSelected: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 4.dp, horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Default.MusicNote,
-            contentDescription = null,
-            tint = if (isSelected) MaterialTheme.colorScheme.primary else if (isAnalyzed) Color(0xFF4CAF50) else Color(0xFFE57373),
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = name,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (isSelected) MaterialTheme.colorScheme.primary else if (isAnalyzed) Color(0xFF4CAF50) else Color(0xFFE57373)
-        )
-    }
-}
-
-@Composable
-fun MediaFoldersCard() {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    var folderUris by remember { mutableStateOf(SettingsManager.authorizedFolderUris) }
-    
-    val openFolderLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        uri?.let {
-            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            context.contentResolver.takePersistableUriPermission(it, flags)
-            
-            val newUris = folderUris.toMutableSet()
-            newUris.add(it.toString())
-            folderUris = newUris
-            SettingsManager.authorizedFolderUris = newUris
-            Logger.info("Added authorized folder: ${it.path}")
-        }
-    }
-
-    SectionCard(
-        title = "Media Folders",
-        actions = {
-            IconButton(onClick = { openFolderLauncher.launch(null) }) {
-                Icon(Icons.Default.Add, contentDescription = "Add Folder")
-            }
-        }
-    ) {
-        Column {
-            if (folderUris.isEmpty()) {
-                Text("No folders authorized. Add a folder to scan for audio files.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-            } else {
-                folderUris.forEach { uriString ->
-                    val uri = Uri.parse(uriString)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = uri.path?.substringAfterLast(":") ?: "Folder",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = {
-                            val newUris = folderUris.toMutableSet()
-                            newUris.remove(uriString)
-                            folderUris = newUris
-                            SettingsManager.authorizedFolderUris = newUris
-                            Logger.info("Removed folder access.")
-                        }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color.Gray)
-                        }
-                    }
+private fun getAudioFiles(context: Context, folderUri: Uri): List<Pair<String, Uri>> {
+    val files = mutableListOf<Pair<String, Uri>>()
+    try {
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folderUri, DocumentsContract.getTreeDocumentId(folderUri))
+        context.contentResolver.query(childrenUri, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { cursor ->
+            while (cursor.moveToNext()) {
+                if (cursor.getString(2)?.startsWith("audio/") == true) {
+                    files.add(cursor.getString(0) to DocumentsContract.buildDocumentUriUsingTree(folderUri, cursor.getString(1)))
                 }
             }
         }
-    }
-}
-
-@Composable
-fun SqueezeDetectorCard(detector: SqueezeDetector, isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
-    val state by detector.state.collectAsState()
-
-    SectionCard(
-        title = "Squeeze Calibration",
-        actions = {
-            Switch(checked = isEnabled, onCheckedChange = onToggle)
-        }
-    ) {
-        Column {
-            Text("Live Magnitude: ${state.liveMagnitude.roundToInt()}")
-            Text("Baseline: ${state.baselineMagnitude.roundToInt()}")
-            Spacer(modifier = Modifier.height(8.dp))
-            val sensitivity = (state.squeezeThresholdPercent * 100).roundToInt()
-            Text("Sensitivity: $sensitivity%")
-            Slider(
-                value = state.squeezeThresholdPercent.toFloat(),
-                onValueChange = { 
-                    val snappedValue = (Math.round(it * 20) / 20f).coerceIn(0.05f, 0.95f)
-                    detector.setSqueezeThreshold(snappedValue.toDouble())
-                    SettingsManager.squeezeThreshold = snappedValue
-                },
-                valueRange = 0.05f..0.95f,
-                steps = 17,
-                enabled = isEnabled
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(onClick = { detector.recalibrate() }, enabled = isEnabled) {
-                Text("Recalibrate")
-            }
-        }
-    }
-}
-
-@Composable
-fun ShakeDetectorCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit, sensitivity: Float, onSensitivityChange: (Float) -> Unit) {
-    SectionCard(
-        title = "Wrist Snap Detection",
-        actions = {
-            Switch(checked = isEnabled, onCheckedChange = onToggle)
-        }
-    ) {
-        Column {
-            val displaySensitivity = sensitivity.roundToInt()
-            Text("Snap Sensitivity: $displaySensitivity")
-            Slider(
-                value = sensitivity,
-                onValueChange = {
-                    val snappedValue = Math.round(it / 5f) * 5f
-                    onSensitivityChange(snappedValue)
-                },
-                valueRange = 5f..50f,
-                steps = 8,
-                enabled = isEnabled
-            )
-            Text(
-                text = "Tuned for restless wrist flips. Higher = more sensitive.",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray
-            )
-        }
-    }
-}
-
-@Composable
-fun HapticControlCard() {
-    val state by HapticManager.state.collectAsState()
-    val context = LocalContext.current
-    var showAdvanced by remember { mutableStateOf(false) }
-
-    SectionCard(title = "Haptic Settings") {
-        Column {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { showAdvanced = !showAdvanced }.fillMaxWidth().padding(vertical = 8.dp)
-            ) {
-                Icon(
-                    imageVector = if (showAdvanced) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Advanced Timing Settings", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-            }
-
-            AnimatedVisibility(visible = showAdvanced) {
-                Column(modifier = Modifier.padding(bottom = 16.dp)) {
-                    Text(
-                        "Fine-tune visualizer synchronization. Lead-in creates a pre-vibration 'glow', and Lead-out holds the highlight after the pulse ends.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text("Lead-in: ${state.leadInMs}ms")
-                    Slider(
-                        value = state.leadInMs.toFloat(),
-                        onValueChange = { HapticManager.updateLeadIn(it.toInt()) },
-                        valueRange = 0f..100f,
-                        steps = 10
-                    )
-
-                    Text("Lead-out: ${state.leadOutMs}ms")
-                    Slider(
-                        value = state.leadOutMs.toFloat(),
-                        onValueChange = { HapticManager.updateLeadOut(it.toInt()) },
-                        valueRange = 0f..100f,
-                        steps = 10
-                    )
-                }
-            }
-
-            AnimatedVisibility(visible = state.isHeartbeatRunning || state.isTestRunning) {
-                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (state.isTestRunning) {
-                        Text(
-                            text = "Test Sequence: ${state.testPulseCount}/3...",
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    } else {
-                        Text(
-                            text = "Session Active: ${state.remainingSeconds}s",
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    LinearProgressIndicator(
-                        progress = { if (state.isTestRunning) state.testPulseCount.toFloat() / 3f else state.remainingSeconds.toFloat() / state.sessionDurationSeconds.toFloat() },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-                    )
-                }
-            }
-
-            val intensityPercent = (state.intensity * 100).roundToInt()
-            Text("Intensity: $intensityPercent%")
-            Slider(
-                value = state.intensity,
-                onValueChange = { 
-                    val snappedValue = (Math.round(it * 20) / 20f).coerceIn(0f, 1f)
-                    HapticManager.updateIntensity(snappedValue)
-                    SettingsManager.intensity = snappedValue
-                },
-                valueRange = 0f..1f,
-                steps = 19,
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Heartbeat BPM: ${state.bpm}")
-            Slider(
-                value = state.bpm.toFloat(),
-                onValueChange = { 
-                    val snappedValue = Math.round(it / 5f) * 5f
-                    val newBpm = snappedValue.toInt()
-                    HapticManager.updateBpm(newBpm)
-                    SettingsManager.bpm = newBpm
-                },
-                valueRange = 30f..200f,
-                steps = 33,
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Session Duration: ${state.sessionDurationSeconds}s")
-            Slider(
-                value = state.sessionDurationSeconds.toFloat(),
-                onValueChange = { 
-                    val snappedValue = Math.round(it / 50f) * 50f
-                    val newDuration = snappedValue.toInt()
-                    HapticManager.updateSessionDuration(newDuration)
-                    SettingsManager.sessionDurationSeconds = newDuration
-                },
-                valueRange = 50f..600f,
-                steps = 10,
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Button(onClick = { HapticManager.testPulseSequence() }, enabled = !state.isHeartbeatRunning && !state.isTestRunning) {
-                    Text("Test Sequence")
-                }
-                
-                if (state.isHeartbeatRunning) {
-                    Button(onClick = { HapticManager.stopHeartbeatSession() }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
-                        Text("Stop Session")
-                    }
-                } else {
-                    Button(onClick = { 
-                        val intent = Intent(context, HapticService::class.java).apply { action = HapticService.ACTION_START }
-                        ContextCompat.startForegroundService(context, intent)
-                        HapticManager.startHeartbeatSession() 
-                    }, enabled = !state.isTestRunning) {
-                        Text("Start Session")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ModesSection(
-    activeModes: Set<PTSDMode>,
-    onModeToggled: (PTSDMode) -> Unit
-) {
-    val modes = listOf(PTSDMode.ActiveHeartbeat, PTSDMode.BBPlayer, PTSDMode.SleepAssistance, PTSDMode.GroundingMode)
-
-    SectionCard(title = "Modes") {
-        Column {
-            modes.forEach { mode ->
-                ModeItem(
-                    mode = mode,
-                    isSelected = mode in activeModes,
-                    onClick = { onModeToggled(mode) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ModeItem(mode: PTSDMode, isSelected: Boolean, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 1.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = mode.icon,
-                contentDescription = mode.name,
-                modifier = Modifier.size(40.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.size(16.dp))
-            Column {
-                Text(text = mode.name, style = MaterialTheme.typography.titleMedium)
-                Text(text = mode.description, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
+    } catch (e: Exception) {}
+    return files
 }
 
 @Composable
 fun LoggerCard() {
     val logHistory by Logger.logHistory.collectAsState()
     var selectedLogLevel by remember { mutableStateOf(LogLevel.DEBUG) }
-    val context = LocalContext.current
     var logToLogcat by remember { mutableStateOf(Logger.logToLogcat) }
-
+    val context = LocalContext.current
     val isDeveloperMode = remember {
         Settings.Secure.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
     }
@@ -1139,113 +657,153 @@ fun LoggerCard() {
         title = "Logging",
         actions = {
             Row {
-                LogLevel.entries.forEach { level ->
+                LogLevel.values().forEach { level ->
                     TextButton(
                         onClick = { selectedLogLevel = level },
                         colors = ButtonDefaults.buttonColors(
-                            contentColor = if (selectedLogLevel == level) MaterialTheme.colorScheme.primary else Color.Gray
+                            contentColor = if (selectedLogLevel == level) MaterialTheme.colorScheme.primary else Color.Gray,
+                            containerColor = Color.Transparent
                         )
                     ) {
-                        Text(level.name)
+                        Text(level.name, fontSize = 10.sp)
                     }
                 }
             }
         }
     ) {
         Column {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-            ) {
+            LazyColumn(modifier = Modifier.fillMaxWidth().height(200.dp)) {
                 items(filteredLogs.reversed()) { log ->
                     val color = when (log.level) {
-                        LogLevel.INFO -> Color.Unspecified
+                        LogLevel.ERROR -> Color.Red
                         LogLevel.DEBUG -> Color.Gray
-                        LogLevel.ERROR -> MaterialTheme.colorScheme.error
+                        else -> Color.Unspecified
                     }
-                    Text(text = log.toString(), style = MaterialTheme.typography.bodySmall, color = color)
+                    Text(log.toString(), style = MaterialTheme.typography.bodySmall, color = color)
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 if (isDeveloperMode) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Log to Logcat", style = MaterialTheme.typography.bodySmall)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Switch(
-                            checked = logToLogcat,
-                            onCheckedChange = {
-                                logToLogcat = it
-                                Logger.logToLogcat = it
-                            }
-                        )
+                        Text("Logcat", style = MaterialTheme.typography.bodySmall)
+                        Switch(checked = logToLogcat, onCheckedChange = { logToLogcat = it; Logger.logToLogcat = it }, modifier = Modifier.scale(0.7f))
                     }
                 }
-                Button(
-                    onClick = {
-                        Logger.clear()
-                        Logger.info("Logs cleared.")
-                    },
-                ) {
-                    Text("Clear Logs")
-                }
+                Button(onClick = { Logger.clear() }) { Text("Clear Logs") }
             }
         }
     }
 }
 
 @Composable
-fun SectionCard(
-    title: String,
-    modifier: Modifier = Modifier,
-    actions: @Composable RowScope.() -> Unit = {},
-    content: @Composable () -> Unit
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
+fun FolderItem(folderUri: Uri, isExpanded: Boolean, onClick: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(if (isExpanded) Icons.Default.FolderOpen else Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.primary)
+        Text(folderUri.path?.substringAfterLast(':') ?: "Folder", modifier = Modifier.weight(1f).padding(start = 16.dp))
+        Icon(if (isExpanded) Icons.Default.ArrowDropDown else Icons.Default.ArrowRight, null)
+    }
+}
+
+@Composable
+fun FileItem(name: String, isAnalyzed: Boolean, isSelected: Boolean, onClick: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.MusicNote, null, tint = if (isSelected) MaterialTheme.colorScheme.primary else if (isAnalyzed) Color(0xFF4CAF50) else Color.Red, modifier = Modifier.size(20.dp))
+        Text(name, modifier = Modifier.padding(start = 16.dp), color = if (isSelected) MaterialTheme.colorScheme.primary else if (isAnalyzed) Color(0xFF4CAF50) else Color.Red)
+    }
+}
+
+@Composable
+fun SectionCard(title: String, actions: @Composable RowScope.() -> Unit = {}, content: @Composable () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    actions()
-                }
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                Row { actions() }
             }
-            Spacer(modifier = Modifier.height(8.dp))
             content()
         }
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun MainScreenPreview() {
-    TheHapticPTSDProjectTheme {
-        val fakeDetector = SqueezeDetector {}
-        MainScreen(
-            squeezeDetector = fakeDetector,
-            isSqueezeEnabled = true,
-            onSqueezeToggle = {},
-            isShakeEnabled = true,
-            onShakeToggle = {},
-            shakeSensitivityValue = 30f,
-            onShakeSensitivityChange = {},
-            onToggleDetection = {}
-        )
+fun ModesSection(activeModes: Set<PTSDMode>, onModeToggled: (PTSDMode) -> Unit) {
+    val modes = listOf(
+        PTSDMode.ActiveHeartbeat,
+        PTSDMode.BBPlayer,
+        PTSDMode.SleepAssistance,
+        PTSDMode.GroundingMode
+    )
+    SectionCard(title = "Modes") {
+        Column {
+            modes.forEach { mode ->
+                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onModeToggled(mode) },
+                    colors = CardDefaults.cardColors(containerColor = if (mode in activeModes) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(mode.icon, null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
+                        Column(modifier = Modifier.padding(start = 12.dp)) {
+                            Text(mode.name, style = MaterialTheme.typography.titleMedium)
+                            Text(mode.description, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MediaFoldersCard() {
+    val context = LocalContext.current
+    var uris by remember { mutableStateOf(SettingsManager.authorizedFolderUris) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        uri?.let {
+            context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val new = uris.toMutableSet().apply { add(it.toString()) }
+            uris = new; SettingsManager.authorizedFolderUris = new
+        }
+    }
+    SectionCard(title = "Media Folders", actions = { IconButton(onClick = { launcher.launch(null) }) { Icon(Icons.Default.Add, null) } }) {
+        uris.forEach { u ->
+            Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.primary)
+                Text(Uri.parse(u).path?.substringAfterLast(':') ?: "Folder", modifier = Modifier.weight(1f).padding(start = 8.dp))
+                IconButton(onClick = { val new = uris.toMutableSet().apply { remove(u) }; uris = new; SettingsManager.authorizedFolderUris = new }) { Icon(Icons.Default.Delete, null, tint = Color.Gray) }
+            }
+        }
+    }
+}
+
+@Composable
+fun SqueezeDetectorCard(detector: SqueezeDetector, isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
+    val state by detector.state.collectAsState()
+    SectionCard(title = "Squeeze Calibration", actions = { Switch(isEnabled, onToggle) }) {
+        Text("Magnitude: ${state.liveMagnitude.toInt()} / Baseline: ${state.baselineMagnitude.toInt()}")
+        Slider(value = state.squeezeThresholdPercent.toFloat(), onValueChange = { detector.setSqueezeThreshold(it.toDouble()); SettingsManager.squeezeThreshold = it }, valueRange = 0.05f..0.95f, enabled = isEnabled)
+        Button(onClick = { detector.recalibrate() }, enabled = isEnabled) { Text("Recalibrate") }
+    }
+}
+
+@Composable
+fun ShakeDetectorCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit, sensitivity: Float, onSensitivityChange: (Float) -> Unit) {
+    SectionCard(title = "Wrist Snap", actions = { Switch(isEnabled, onToggle) }) {
+        Text("Sensitivity: ${sensitivity.toInt()}")
+        Slider(value = sensitivity, onValueChange = onSensitivityChange, valueRange = 5f..50f, enabled = isEnabled)
+    }
+}
+
+@Composable
+fun HapticControlCard() {
+    val state by HapticManager.state.collectAsState()
+    SectionCard(title = "Haptic Settings") {
+        Text("Intensity: ${(state.intensity*100).toInt()}%")
+        Slider(value = state.intensity, onValueChange = { HapticManager.updateIntensity(it); SettingsManager.intensity = it })
+        Text("BPM: ${state.bpm}")
+        Slider(value = state.bpm.toFloat(), onValueChange = { HapticManager.updateBpm(it.toInt()); SettingsManager.bpm = it.toInt() }, valueRange = 40f..180f)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Button(onClick = { HapticManager.testPulseSequence() }) { Text("Test") }
+            if (state.isHeartbeatRunning) Button(onClick = { HapticManager.stopHeartbeatSession() }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Stop Session") }
+            else Button(onClick = { HapticManager.startHeartbeatSession() }) { Text("Start Session") }
+        }
     }
 }

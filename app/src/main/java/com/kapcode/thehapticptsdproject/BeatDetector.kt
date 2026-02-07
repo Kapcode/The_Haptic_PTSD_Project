@@ -50,6 +50,11 @@ data class BeatPlayerState(
     val isPlaying: Boolean = false,
     val isAnalyzing: Boolean = false,
     val analysisProgress: Float = 0f,
+    val analysisFileIndex: Int = 0,
+    val analysisTotalFiles: Int = 0,
+    val analysisTaskProgress: String = "", // e.g. "1 of 10"
+    val analysisFileDuration: String = "", // e.g. "3:45"
+    val analysisTotalRemainingMs: Long = 0, // Sum of remaining track durations
     val currentTimestampMs: Long = 0,
     val totalDurationMs: Long = 0,
     val nextBeatIndex: Int = 0,
@@ -165,6 +170,16 @@ object BeatDetector {
         return if (index == -1) beats.size else index
     }
 
+    fun setBatchProgress(current: Int, total: Int, duration: String = "", remainingMs: Long = 0) {
+        _playerState.update { it.copy(
+            analysisFileIndex = current,
+            analysisTotalFiles = total,
+            analysisTaskProgress = "$current of $total",
+            analysisFileDuration = duration,
+            analysisTotalRemainingMs = remainingMs
+        ) }
+    }
+
     suspend fun analyzeAudioUri(
         context: Context,
         uri: Uri,
@@ -228,7 +243,7 @@ object BeatDetector {
     fun cancelAnalysis() {
         analysisJob?.cancel()
         analysisLock.set(false)
-        _playerState.update { it.copy(isAnalyzing = false) }
+        _playerState.update { it.copy(isAnalyzing = false, analysisTaskProgress = "", analysisFileDuration = "", analysisTotalRemainingMs = 0) }
     }
 
     private suspend fun performAnalysisPass(context: Context, uri: Uri, profile: BeatProfile, energyThreshold: Double): List<BeatCandidate> = withContext(Dispatchers.Default) {

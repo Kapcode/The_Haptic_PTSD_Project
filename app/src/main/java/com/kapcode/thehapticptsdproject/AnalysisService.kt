@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
@@ -27,7 +28,7 @@ class AnalysisService : Service() {
         createNotificationChannel()
         notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Haptic Analysis")
-            .setSmallIcon(R.drawable.ic_launcher_foreground) // Replace with your app's icon
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
     }
 
@@ -37,37 +38,75 @@ class AnalysisService : Service() {
             return START_NOT_STICKY
         }
 
-        val folderUris = intent?.getStringArrayListExtra(EXTRA_FOLDER_URIS)?.map { Uri.parse(it) } ?: return START_NOT_STICKY
+        val fileUris = intent?.getStringArrayListExtra(EXTRA_FILE_URIS)?.map { Uri.parse(it) } ?: return START_NOT_STICKY
+        val fileNames = intent.getStringArrayListExtra(EXTRA_FILE_NAMES) ?: return START_NOT_STICKY
+        val parentUris = intent.getStringArrayListExtra(EXTRA_PARENT_URIS)?.map { Uri.parse(it) } ?: return START_NOT_STICKY
+        
         val profileNames = intent.getStringArrayListExtra(EXTRA_PROFILES) ?: return START_NOT_STICKY
         val profiles = profileNames.map { BeatProfile.valueOf(it) }
 
         startForeground(NOTIFICATION_ID, createNotification("Starting analysis...", 0, 0))
 
         scope.launch {
-            val totalFiles = folderUris.sumOf { getFileCount(it) } * profiles.size
-            var filesProcessed = 0
-
-            for (folderUri in folderUris) {
-                val files = getFilesFromFolder(folderUri)
-                for ((fileName, fileUri) in files) {
-                    if (!isActive) break
-                    for (profile in profiles) {
-                        if (!isActive) break
-                        val notificationText = "Analyzing: $fileName (${profile.name})"
-                        updateNotification(notificationText, filesProcessed, totalFiles)
-                        
-                        val beats = BeatDetector.analyzeAudioUri(this@AnalysisService, fileUri, profile)
-                        if (beats.isNotEmpty()) {
-                            BeatDetector.saveProfile(this@AnalysisService, folderUri, fileName, profile, beats)
-                        }
-                        filesProcessed++
+            val retriever = MediaMetadataRetriever()
+            
+            // Calculate total initial duration for remaining time tracking
+            var totalRemainingMs = 0L
+            val fileDurations = LongArray(fileUris.size)
+            
+            for (i in fileUris.indices) {
+                var duration = 0L
+                try {
+                    contentResolver.openFileDescriptor(fileUris[i], "r")?.use { pfd ->
+                        retriever.setDataSource(pfd.fileDescriptor)
+                        duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: 0L
                     }
+                } catch (e: Exception) { }
+                fileDurations[i] = duration
+                totalRemainingMs += duration * profiles.size // Total work including profiles
+            }
+
+            val totalTasks = fileUris.size * profiles.size
+            var tasksProcessed = 0
+
+            for (i in fileUris.indices) {
+                if (!isActive) break
+                val fileUri = fileUris[i]
+                val fileName = fileNames[i]
+                val parentUri = parentUris[i]
+                val fileDuration = fileDurations[i]
+                
+                for (profile in profiles) {
+                    if (!isActive) break
+                    val currentTaskNum = tasksProcessed + 1
+                    
+                    // Update detector state with current task info and total remaining audio duration
+                    BeatDetector.setBatchProgress(
+                        currentTaskNum, 
+                        totalTasks, 
+                        formatDuration(fileDuration),
+                        totalRemainingMs
+                    )
+                    
+                    val remainingText = formatDuration(totalRemainingMs)
+                    val notificationText = "($currentTaskNum/$totalTasks) ~ $remainingText left. Analyzing: $fileName"
+                    updateNotification(notificationText, tasksProcessed, totalTasks)
+                    
+                    val beats = BeatDetector.analyzeAudioUri(this@AnalysisService, fileUri, profile)
+                    if (beats.isNotEmpty()) {
+                        BeatDetector.saveProfile(this@AnalysisService, parentUri, fileName, profile, beats)
+                    }
+                    
+                    tasksProcessed++
+                    totalRemainingMs -= fileDuration // Subtract duration of ONE profile task
                 }
             }
             
-            // Analysis complete or cancelled
+            try { retriever.release() } catch (e: Exception) { }
+
             if (isActive) {
-                val completionText = "Batch analysis complete. $filesProcessed profiles generated."
+                BeatDetector.setBatchProgress(0, 0, "", 0)
+                val completionText = "Batch analysis complete. $tasksProcessed tasks finished."
                 notificationManager.notify(NOTIFICATION_ID, 
                     notificationBuilder
                         .setContentText(completionText)
@@ -83,48 +122,18 @@ class AnalysisService : Service() {
         return START_STICKY
     }
 
+    private fun formatDuration(ms: Long): String {
+        val totalSecs = ms / 1000
+        val mins = totalSecs / 60
+        val secs = totalSecs % 60
+        return if (mins > 0) "${mins}m ${secs}s" else "${secs}s"
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
         super.onDestroy()
         job.cancel()
-    }
-
-    private fun getFileCount(folderUri: Uri): Int {
-        var count = 0
-        try {
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folderUri, DocumentsContract.getTreeDocumentId(folderUri))
-            contentResolver.query(childrenUri, arrayOf(DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    if (cursor.getString(0)?.startsWith("audio/") == true) {
-                        count++
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Logger.error("Error counting files: ${e.message}")
-        }
-        return count
-    }
-
-    private fun getFilesFromFolder(folderUri: Uri): List<Pair<String, Uri>> {
-        val files = mutableListOf<Pair<String, Uri>>()
-        try {
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folderUri, DocumentsContract.getTreeDocumentId(folderUri))
-            contentResolver.query(childrenUri, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    val name = cursor.getString(0)
-                    val id = cursor.getString(1)
-                    val mime = cursor.getString(2)
-                    if (mime.startsWith("audio/")) {
-                        files.add(name to DocumentsContract.buildDocumentUriUsingTree(folderUri, id))
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Logger.error("Error getting files: ${e.message}")
-        }
-        return files
     }
 
     private fun createNotification(text: String, progress: Int, max: Int): Notification {
@@ -152,7 +161,9 @@ class AnalysisService : Service() {
     companion object {
         private const val NOTIFICATION_ID = 2
         private const val CHANNEL_ID = "AnalysisServiceChannel"
-        const val EXTRA_FOLDER_URIS = "folder_uris"
+        const val EXTRA_FILE_URIS = "file_uris"
+        const val EXTRA_FILE_NAMES = "file_names"
+        const val EXTRA_PARENT_URIS = "parent_uris"
         const val EXTRA_PROFILES = "profiles"
         const val ACTION_CANCEL = "ACTION_CANCEL"
     }
