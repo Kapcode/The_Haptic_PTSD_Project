@@ -39,11 +39,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.kapcode.thehapticptsdproject.ui.theme.TheHapticPTSDProjectTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -367,7 +373,7 @@ fun BeatPlayerCard() {
         )
     }
 
-    LaunchedEffect(expandedFolderUri) {
+    LaunchedEffect(expandedFolderUri, selectedProfile) {
         val uri = expandedFolderUri
         if (uri != null) {
             val files = mutableListOf<Pair<String, Uri>>()
@@ -415,7 +421,7 @@ fun BeatPlayerCard() {
     SectionCard(
         title = "Bilateral Beat Player",
         actions = {
-            Button(onClick = { showAnalysisDialog = true }) {
+            Button(onClick = { showAnalysisDialog = true }, enabled = !playerState.isAnalyzing) {
                 Text("Batch Analyze")
             }
         }
@@ -439,8 +445,12 @@ fun BeatPlayerCard() {
                 AnimatedVisibility(visible = isExpanded) {
                     Column(modifier = Modifier.padding(start = 16.dp)) {
                         filesInExpandedFolder.forEach { (name, uri) ->
+                            val isAnalyzed = remember(name, selectedProfile) {
+                                BeatDetector.findExistingProfile(context, folderUri, name, selectedProfile) != null
+                            }
                             FileItem(
                                 name = name,
+                                isAnalyzed = isAnalyzed,
                                 isSelected = playerState.selectedFileUri == uri,
                                 onClick = { BeatDetector.updateSelectedTrack(uri, name) }
                             )
@@ -453,11 +463,22 @@ fun BeatPlayerCard() {
             Spacer(modifier = Modifier.height(16.dp))
 
             Box {
-                OutlinedButton(onClick = { /* open profile dropdown */ }, modifier = Modifier.fillMaxWidth()) {
+                var expandedProfiles by remember { mutableStateOf(false) }
+                OutlinedButton(onClick = { expandedProfiles = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Profile: ${selectedProfile.name}")
                     Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                 }
-                // DropdownMenu for profiles
+                DropdownMenu(expanded = expandedProfiles, onDismissRequest = { expandedProfiles = false }) {
+                    BeatProfile.entries.forEach { profile ->
+                        DropdownMenuItem(
+                            text = { Text(profile.name) },
+                            onClick = {
+                                selectedProfile = profile
+                                expandedProfiles = false
+                            }
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -475,8 +496,25 @@ fun BeatPlayerCard() {
             Spacer(modifier = Modifier.height(16.dp))
 
             if (playerState.isAnalyzing) {
-                Text("Analyzing beats: ${(playerState.analysisProgress * 100).toInt()}%")
-                LinearProgressIndicator(progress = { playerState.analysisProgress }, modifier = Modifier.fillMaxWidth())
+                Column {
+                    Text("Analyzing beats: ${(playerState.analysisProgress * 100).toInt()}%")
+                    LinearProgressIndicator(progress = { playerState.analysisProgress }, modifier = Modifier.fillMaxWidth())
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            Logger.info("Cancelling analysis...")
+                            val intent = Intent(context, AnalysisService::class.java).apply {
+                                action = AnalysisService.ACTION_CANCEL
+                            }
+                            context.startService(intent)
+                            BeatDetector.cancelAnalysis()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Cancel Analysis")
+                    }
+                }
             } else if (playerState.detectedBeats.isEmpty()) {
                 Button(
                     onClick = {
@@ -556,62 +594,125 @@ fun BackgroundAnalysisDialog(
     onDismiss: () -> Unit,
     onStart: (Set<Uri>, Set<BeatProfile>) -> Unit
 ) {
+    val context = LocalContext.current
     val folderUris = SettingsManager.authorizedFolderUris.map { Uri.parse(it) }
     var selectedFolders by remember { mutableStateOf(setOf<Uri>()) }
     var selectedProfiles by remember { mutableStateOf(setOf<BeatProfile>()) }
+    
+    // Status maps: Folder/Profile -> IsFullyAnalyzed
+    var folderStatus by remember { mutableStateOf(mapOf<Uri, Boolean>()) }
+    var profileStatus by remember { mutableStateOf(mapOf<BeatProfile, Boolean>()) }
+    var isScanning by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            val fStatus = mutableMapOf<Uri, Boolean>()
+            folderUris.forEach { uri ->
+                val files = getAudioFiles(context, uri)
+                if (files.isEmpty()) {
+                    fStatus[uri] = true // Empty is "done"
+                } else {
+                    // Folder is analyzed if ALL its files have at least one profile
+                    val allAnalyzed = files.all { (name, _) ->
+                        BeatProfile.entries.any { profile ->
+                            BeatDetector.findExistingProfile(context, uri, name, profile) != null
+                        }
+                    }
+                    fStatus[uri] = allAnalyzed
+                }
+            }
+            
+            val pStatus = mutableMapOf<BeatProfile, Boolean>()
+            // Profiles status based on all authorized files
+            BeatProfile.entries.forEach { profile ->
+                pStatus[profile] = folderUris.all { folderUri ->
+                    getAudioFiles(context, folderUri).all { (name, _) ->
+                        BeatDetector.findExistingProfile(context, folderUri, name, profile) != null
+                    }
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                folderStatus = fStatus
+                profileStatus = pStatus
+                // Default selection: everything not fully analyzed
+                selectedFolders = fStatus.filter { !it.value }.keys
+                selectedProfiles = pStatus.filter { !it.value }.keys
+                isScanning = false
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Background Analysis") },
         text = {
-            Column {
-                Text("Select folders to analyze:", style = MaterialTheme.typography.titleMedium)
-                folderUris.forEach { folderUri ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                selectedFolders = if (folderUri in selectedFolders) {
-                                    selectedFolders - folderUri
-                                } else {
-                                    selectedFolders + folderUri
-                                }
-                            }
-                            .padding(vertical = 4.dp)
-                    ) {
-                        Checkbox(
-                            checked = folderUri in selectedFolders,
-                            onCheckedChange = null
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(folderUri.path?.substringAfterLast(':') ?: "Folder")
-                    }
+            if (isScanning) {
+                Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
                 }
+            } else {
+                Column {
+                    Text(
+                        "⚠️ This process will take a significant amount of time depending on library size. It will run in the background via notification.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    // Legend
+                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.Center) {
+                        Text("Legend: ", style = MaterialTheme.typography.labelSmall)
+                        Text("Analyzed", color = Color(0xFF4CAF50), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Text(" | ", style = MaterialTheme.typography.labelSmall)
+                        Text("Missing", color = Color(0xFFE57373), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
 
-                Text("Select profiles to generate:", style = MaterialTheme.typography.titleMedium)
-                BeatProfile.entries.forEach { profile ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                selectedProfiles = if (profile in selectedProfiles) {
-                                    selectedProfiles - profile
-                                } else {
-                                    selectedProfiles + profile
+                    Text("Select folders to analyze:", style = MaterialTheme.typography.titleMedium)
+                    folderUris.forEach { folderUri ->
+                        val isAnalyzed = folderStatus[folderUri] ?: false
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedFolders = if (folderUri in selectedFolders) selectedFolders - folderUri else selectedFolders + folderUri
                                 }
-                            }
-                            .padding(vertical = 4.dp)
-                    ) {
-                        Checkbox(
-                            checked = profile in selectedProfiles,
-                            onCheckedChange = null
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(profile.name)
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Checkbox(checked = folderUri in selectedFolders, onCheckedChange = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = folderUri.path?.substringAfterLast(':') ?: "Folder",
+                                color = if (isAnalyzed) Color(0xFF4CAF50) else Color(0xFFE57373),
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text("Select profiles to generate:", style = MaterialTheme.typography.titleMedium)
+                    BeatProfile.entries.forEach { profile ->
+                        val isAnalyzed = profileStatus[profile] ?: false
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedProfiles = if (profile in selectedProfiles) selectedProfiles - profile else selectedProfiles + profile
+                                }
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Checkbox(checked = profile in selectedProfiles, onCheckedChange = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = profile.name,
+                                color = if (isAnalyzed) Color(0xFF4CAF50) else Color(0xFFE57373),
+                                fontSize = 14.sp
+                            )
+                        }
                     }
                 }
             }
@@ -630,6 +731,32 @@ fun BackgroundAnalysisDialog(
             }
         }
     )
+}
+
+// Helper to avoid duplicate code
+private fun getAudioFiles(context: Context, folderUri: Uri): List<Pair<String, Uri>> {
+    val files = mutableListOf<Pair<String, Uri>>()
+    try {
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+            folderUri,
+            DocumentsContract.getTreeDocumentId(folderUri)
+        )
+        context.contentResolver.query(
+            childrenUri,
+            arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_MIME_TYPE),
+            null, null, null
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(0)
+                val id = cursor.getString(1)
+                val mime = cursor.getString(2)
+                if (mime.startsWith("audio/")) {
+                    files.add(name to DocumentsContract.buildDocumentUriUsingTree(folderUri, id))
+                }
+            }
+        }
+    } catch (e: Exception) { }
+    return files
 }
 
 @Composable
@@ -660,7 +787,7 @@ fun FolderItem(folderUri: Uri, isExpanded: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun FileItem(name: String, isSelected: Boolean, onClick: () -> Unit) {
+fun FileItem(name: String, isAnalyzed: Boolean, isSelected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -671,14 +798,14 @@ fun FileItem(name: String, isSelected: Boolean, onClick: () -> Unit) {
         Icon(
             imageVector = Icons.Default.MusicNote,
             contentDescription = null,
-            tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
+            tint = if (isSelected) MaterialTheme.colorScheme.primary else if (isAnalyzed) Color(0xFF4CAF50) else Color(0xFFE57373),
             modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = name,
             style = MaterialTheme.typography.bodyMedium,
-            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Unspecified
+            color = if (isSelected) MaterialTheme.colorScheme.primary else if (isAnalyzed) Color(0xFF4CAF50) else Color(0xFFE57373)
         )
     }
 }

@@ -32,6 +32,11 @@ class AnalysisService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_CANCEL) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         val folderUris = intent?.getStringArrayListExtra(EXTRA_FOLDER_URIS)?.map { Uri.parse(it) } ?: return START_NOT_STICKY
         val profileNames = intent.getStringArrayListExtra(EXTRA_PROFILES) ?: return START_NOT_STICKY
         val profiles = profileNames.map { BeatProfile.valueOf(it) }
@@ -45,7 +50,9 @@ class AnalysisService : Service() {
             for (folderUri in folderUris) {
                 val files = getFilesFromFolder(folderUri)
                 for ((fileName, fileUri) in files) {
+                    if (!isActive) break
                     for (profile in profiles) {
+                        if (!isActive) break
                         val notificationText = "Analyzing: $fileName (${profile.name})"
                         updateNotification(notificationText, filesProcessed, totalFiles)
                         
@@ -58,15 +65,17 @@ class AnalysisService : Service() {
                 }
             }
             
-            // Analysis complete
-            val completionText = "Batch analysis complete. $filesProcessed profiles generated."
-            notificationManager.notify(NOTIFICATION_ID, 
-                notificationBuilder
-                    .setContentText(completionText)
-                    .setProgress(0, 0, false)
-                    .setOngoing(false)
-                    .build()
-            )
+            // Analysis complete or cancelled
+            if (isActive) {
+                val completionText = "Batch analysis complete. $filesProcessed profiles generated."
+                notificationManager.notify(NOTIFICATION_ID, 
+                    notificationBuilder
+                        .setContentText(completionText)
+                        .setProgress(0, 0, false)
+                        .setOngoing(false)
+                        .build()
+                )
+            }
             stopForeground(STOP_FOREGROUND_DETACH)
             stopSelf()
         }
@@ -145,5 +154,6 @@ class AnalysisService : Service() {
         private const val CHANNEL_ID = "AnalysisServiceChannel"
         const val EXTRA_FOLDER_URIS = "folder_uris"
         const val EXTRA_PROFILES = "profiles"
+        const val ACTION_CANCEL = "ACTION_CANCEL"
     }
 }

@@ -78,6 +78,7 @@ object BeatDetector {
 
     private var mediaPlayer: MediaPlayer? = null
     private var playbackJob: Job? = null
+    private var analysisJob: Job? = null
     private val analysisLock = AtomicBoolean(false)
     
     private const val ENERGY_HISTORY_SIZE = 43 // ~1 second of audio history
@@ -156,20 +157,20 @@ object BeatDetector {
             return@withContext emptyList()
         }
 
+        _playerState.value = _playerState.value.copy(isAnalyzing = true, analysisProgress = 0f, detectedBeats = emptyList())
+        analysisJob = currentCoroutineContext()[Job]
+        
         try {
             Logger.info("Starting analysis for URI: $uri")
-            _playerState.value = _playerState.value.copy(isAnalyzing = true, analysisProgress = 0f, detectedBeats = emptyList())
-
             val candidates = performAnalysisPass(context, uri, profile, 0.0)
             if (candidates.isEmpty()) {
                 Logger.error("Pass 1: No beat candidates found.")
-                _playerState.value = _playerState.value.copy(isAnalyzing = false)
                 return@withContext emptyList()
             }
             Logger.info("Pass 1: Found ${candidates.size} potential candidates.")
             
             val sortedCandidates = candidates.sortedByDescending { it.energy }
-            val thresholdIndex = (sortedCandidates.size * 0.2).toInt()
+            val thresholdIndex = (sortedCandidates.size * 0.2).toInt().coerceAtMost(sortedCandidates.size - 1)
             val dynamicThreshold = sortedCandidates[thresholdIndex].energy
             Logger.info("Dynamic energy threshold set to: $dynamicThreshold")
 
@@ -184,12 +185,26 @@ object BeatDetector {
 
             val detectedBeats = finalBeats.map { DetectedBeat(it.timestampMs, it.intensity, it.durationMs, 2) }
             
-            _playerState.value = _playerState.value.copy(detectedBeats = detectedBeats, isAnalyzing = false, analysisProgress = 1f)
+            _playerState.value = _playerState.value.copy(detectedBeats = detectedBeats, analysisProgress = 1f)
             Logger.info("Analysis complete. Final beat count: ${detectedBeats.size}")
             return@withContext detectedBeats
+        } catch (e: CancellationException) {
+            Logger.info("Analysis cancelled.")
+            throw e
+        } catch (e: Exception) {
+            Logger.error("Analysis Error: ${e.message}")
+            return@withContext emptyList()
         } finally {
+            _playerState.value = _playerState.value.copy(isAnalyzing = false)
             analysisLock.set(false)
+            analysisJob = null
         }
+    }
+
+    fun cancelAnalysis() {
+        analysisJob?.cancel()
+        analysisLock.set(false)
+        _playerState.value = _playerState.value.copy(isAnalyzing = false)
     }
 
     private suspend fun performAnalysisPass(context: Context, uri: Uri, profile: BeatProfile, energyThreshold: Double): List<BeatCandidate> = withContext(Dispatchers.Default) {
@@ -390,7 +405,7 @@ object BeatDetector {
         return when (profile) {
             BeatProfile.AMPLITUDE -> ProcessResult(analyzeAmplitude(pcm, timestampMs, channels, energyThreshold, energyHistory))
             BeatProfile.BASS -> analyzeBassPeak(pcm, timestampMs, sampleRate, channels, energyThreshold, lastBassEnergy)
-            BeatProfile.DRUM -> ProcessResult(analyzeDrumPeak(pcm, timestampMs, channels, energyThreshold, energyHistory))
+            BeatProfile.DRUM -> ProcessResult(analyzeDrumPeak(pcm, timestampMs, sampleRate, channels, energyThreshold, energyHistory))
             BeatProfile.GUITAR -> analyzeGuitarPeak(pcm, timestampMs, sampleRate, channels, energyThreshold, lastGuitarEnergy)
         }
     }
@@ -461,7 +476,7 @@ object BeatDetector {
         return ProcessResult(null, newBassEnergy = avgEnergy)
     }
 
-    private fun analyzeDrumPeak(pcm: ShortArray, timestampMs: Long, channels: Int, energyThreshold: Double, energyHistory: MutableList<Double>): BeatCandidate? {
+    private fun analyzeDrumPeak(pcm: ShortArray, timestampMs: Long, sampleRate: Int, channels: Int, energyThreshold: Double, energyHistory: MutableList<Double>): BeatCandidate? {
         if (pcm.isEmpty()) return null
         
         var sum = 0.0
