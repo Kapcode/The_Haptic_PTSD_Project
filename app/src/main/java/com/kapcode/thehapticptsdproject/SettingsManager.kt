@@ -2,6 +2,7 @@ package com.kapcode.thehapticptsdproject
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 
@@ -65,6 +66,14 @@ object SettingsManager {
     var mediaVolume: Float
         get() = prefs.getFloat("media_volume", 1.0f)
         set(value) = prefs.edit().putFloat("media_volume", value).apply()
+
+    var lastPlayedAudioUri: String?
+        get() = prefs.getString("last_played_audio_uri", null)
+        set(value) = prefs.edit().putString("last_played_audio_uri", value).apply()
+
+    var lastPlayedAudioName: String?
+        get() = prefs.getString("last_played_audio_name", null)
+        set(value) = prefs.edit().putString("last_played_audio_name", value).apply()
 
     // Snap Settings
     var snapIntensity: Float

@@ -21,6 +21,9 @@ Analyze any audio file from your library to generate a custom haptic profile. Th
 ### Live Haptic Visualizer
 Real-time visual feedback of the haptic engine's output, available both as a dedicated card in the app and as part of a persistent notification. This provides clear confirmation of when the app is generating vibrations, featuring animations for both phone and external controller motors.
 
+### Notification Media Controls
+Full media playback controls are integrated directly into the persistent notification. This allows you to play, pause, stop, and skip forward or backward by 5 or 30 seconds without needing to open the app. The controls are synchronized with the in-app player.
+
 ### Intelligent Sleep Assistance (Planned)
 Specialized, rhythmic haptic sessions designed to assist in falling asleep and maintaining sleep quality. The app is evolving to detect signs of tremors or night terrors and respond with gentle tactile interventions.
 
@@ -34,7 +37,7 @@ Built for the most sensitive contexts, all detection and analysis happen locally
 
 ## Tech Stack
 - **UI:** Jetpack Compose (Material 3)
-- **Logic:** Kotlin / Coroutines
+- **Logic:** Kotlin / Coroutines / ViewModels
 - **Sensing:** Acoustic Pressure Detection (sonar-based) & Linear Acceleration (gravity-independent motion)
 - **Background:** Android Foreground Service with WakeLock
 - **Signal Processing:** JTransforms (FFT) / Adaptive Transient Detection

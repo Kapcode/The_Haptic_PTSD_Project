@@ -205,14 +205,6 @@ class HapticService : Service(), SensorEventListener {
             setInt(R.id.img_controller_left_bottom, "setAlpha", getAlpha(hState.controllerLeftBottomIntensity))
             setInt(R.id.img_controller_right_top, "setAlpha", getAlpha(hState.controllerRightTopIntensity))
             setInt(R.id.img_controller_right_bottom, "setAlpha", getAlpha(hState.controllerRightBottomIntensity))
-            
-            setImageViewResource(R.id.img_phone_left, if (hState.phoneLeftIntensity > 0.01f) R.drawable.phone_left_on else R.drawable.phone_left_off)
-            setImageViewResource(R.id.img_phone_right, if (hState.phoneRightIntensity > 0.01f) R.drawable.phone_right_on else R.drawable.phone_right_off)
-            
-            setImageViewResource(R.id.img_controller_left_top, if (hState.controllerLeftTopIntensity > 0.01f) R.drawable.controller_left_on else R.drawable.controller_left_off)
-            setImageViewResource(R.id.img_controller_left_bottom, if (hState.controllerLeftBottomIntensity > 0.01f) R.drawable.controller_left_on else R.drawable.controller_left_off)
-            setImageViewResource(R.id.img_controller_right_top, if (hState.controllerRightTopIntensity > 0.01f) R.drawable.controller_right_on else R.drawable.controller_right_off)
-            setImageViewResource(R.id.img_controller_right_bottom, if (hState.controllerRightBottomIntensity > 0.01f) R.drawable.controller_right_on else R.drawable.controller_right_off)
 
             if (bState.isPlaying || bState.isPaused) {
                 setViewVisibility(R.id.player_controls, android.view.View.VISIBLE)
@@ -246,6 +238,7 @@ class HapticService : Service(), SensorEventListener {
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setVibrate(longArrayOf(0L)) // Explicitly disable vibration on the notification itself
 
         notificationBuilder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
 
@@ -278,6 +271,11 @@ class HapticService : Service(), SensorEventListener {
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun triggerHaptics(source: String) {
+        val playerState = BeatDetector.playerState.value
+        if (playerState.isPlaying || playerState.isPaused) {
+            return // Don't trigger any haptics if BB Player is active
+        }
+
         if (isHeartbeatModeActive) {
             Logger.info("$source detected! Starting heartbeat.")
             HapticManager.startHeartbeatSession()
@@ -307,7 +305,10 @@ class HapticService : Service(), SensorEventListener {
             CHANNEL_ID,
             "Haptic PTSD Monitoring",
             NotificationManager.IMPORTANCE_HIGH
-        )
+        ).apply {
+            enableVibration(false)
+            vibrationPattern = longArrayOf(0L)
+        }
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(serviceChannel)
     }

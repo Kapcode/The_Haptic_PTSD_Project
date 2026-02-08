@@ -155,9 +155,12 @@ class MainActivity : ComponentActivity() {
             }
             if (isSqueezeEnabled) squeezeDetector.start() else squeezeDetector.stop()
         } else {
-            intent.action = HapticService.ACTION_STOP
-            stopService(intent)
-            squeezeDetector.stop()
+            val playerState = BeatDetector.playerState.value
+            if (!playerState.isPlaying && !playerState.isPaused) {
+                intent.action = HapticService.ACTION_STOP
+                stopService(intent)
+                squeezeDetector.stop()
+            }
         }
     }
 

@@ -32,6 +32,12 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
     val filesInExpandedFolder by vm.filesInExpandedFolder
     val showAnalysisDialog by vm.showAnalysisDialog
 
+    LaunchedEffect(folderUris) {
+        if (folderUris.isNotEmpty()) {
+            vm.autoSelectTrack(context)
+        }
+    }
+
     LaunchedEffect(expandedFolderUri) {
         vm.loadFilesInFolder(context, expandedFolderUri)
     }

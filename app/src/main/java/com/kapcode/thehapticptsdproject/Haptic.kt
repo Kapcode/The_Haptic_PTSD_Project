@@ -102,6 +102,11 @@ object HapticManager {
     }
 
     fun startHeartbeatSession() {
+        val playerState = BeatDetector.playerState.value
+        if (playerState.isPlaying || playerState.isPaused) {
+            return // Don't start heartbeat if BB Player is active
+        }
+
         if (_state.value.isHeartbeatRunning) {
             _state.value = _state.value.copy(remainingSeconds = _state.value.sessionDurationSeconds)
             return

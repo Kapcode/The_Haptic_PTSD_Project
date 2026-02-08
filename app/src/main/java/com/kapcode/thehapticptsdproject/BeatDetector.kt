@@ -324,6 +324,11 @@ object BeatDetector {
         if (_playerState.value.detectedBeats.isEmpty()) return
 
         stopPlayback()
+        HapticManager.stopHeartbeatSession() // Ensure heartbeat is stopped
+
+        // Save last played
+        SettingsManager.lastPlayedAudioUri = uri.toString()
+        SettingsManager.lastPlayedAudioName = _playerState.value.selectedFileName
         
         mediaPlayer = MediaPlayer().apply {
             setDataSource(context, uri)

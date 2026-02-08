@@ -94,7 +94,66 @@ class BeatPlayerViewModel : ViewModel() {
         }
     }
 
+    fun autoSelectTrack(context: Context) {
+        if (playerState.value.selectedFileUri != null) return
+
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                // 1. Try last played
+                val lastUriStr = SettingsManager.lastPlayedAudioUri
+                val lastName = SettingsManager.lastPlayedAudioName
+                if (lastUriStr != null && lastName != null) {
+                    val lastUri = Uri.parse(lastUriStr)
+                    // Check if it belongs to an authorized folder
+                    val root = folderUris.value.find { lastUriStr.startsWith(it) }
+                    if (root != null) {
+                        onFileSelected(lastUri, lastName)
+                        return@withContext
+                    }
+                }
+
+                // 2. Look for analyzed files, prefer shortest, then alphabetical
+                var bestFile: AnalysisFile? = null
+                var bestFolderUri: Uri? = null
+
+                for (folderUriStr in folderUris.value) {
+                    val folderUri = Uri.parse(folderUriStr)
+                    val files = getAudioFilesWithDetails(context, folderUri)
+                    
+                    val analyzedFiles = files.filter { file ->
+                        BeatDetector.findExistingProfile(context, folderUri, file.name, selectedProfile.value) != null
+                    }
+
+                    if (analyzedFiles.isNotEmpty()) {
+                        // Sort by duration (shortest first), then name
+                        val sorted = analyzedFiles.sortedWith(compareBy({ it.durationMs }, { it.name }))
+                        val top = sorted.first()
+                        
+                        if (bestFile == null || top.durationMs < bestFile!!.durationMs) {
+                            bestFile = top
+                            bestFolderUri = folderUri
+                        } else if (top.durationMs == bestFile!!.durationMs && top.name < bestFile!!.name) {
+                            bestFile = top
+                            bestFolderUri = folderUri
+                        }
+                    }
+                }
+
+                bestFile?.let {
+                    onFileSelected(it.uri, it.name)
+                }
+            }
+        }
+    }
+
     fun play(context: Context) {
+        // Ensure the service is running so the notification is visible
+        val intent = Intent(context, HapticService::class.java).apply {
+            action = HapticService.ACTION_START
+        }
+        (context as? MainActivity)?.runWithNotificationPermission {
+            ContextCompat.startForegroundService(context, intent)
+        }
         BeatDetector.playSynchronized(context)
     }
 

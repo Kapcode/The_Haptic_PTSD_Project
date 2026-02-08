@@ -8,6 +8,7 @@ This document contains technical details, architectural decisions, and developme
 - **Target SDK:** 36.
 - **UI Framework:** Jetpack Compose with Material 3.
 - **Language:** Kotlin / Coroutines.
+- **Architecture:** MVVM with ViewModels (`BeatPlayerViewModel`, `ModesViewModel`, etc.)
 - **Background Logic:** Android Foreground Service (`HapticService.kt`) with `PARTIAL_WAKE_LOCK`.
 - **Persistence:** `SharedPreferences` managed via `SettingsManager.kt`.
 
@@ -47,6 +48,10 @@ This document contains technical details, architectural decisions, and developme
 - **Implementation**: Lazy-loading folder/file browser using SAF (Storage Access Framework) URIs.
 - **Auto-loading**: Automatically scans for and loads existing haptic profiles (.json) when a track or profile type is selected.
 
+### Notification Controls
+- **Implementation**: Media controls (play, pause, stop, skip) are implemented in the `HapticService` notification.
+- **Synchronization**: The notification controls are synchronized with the in-app player via `BeatDetector`.
+
 ## Future Features & Ideas
 
 ### Picture-in-Picture (PiP) Haptic Visualizer
@@ -62,7 +67,7 @@ This document contains technical details, architectural decisions, and developme
 ### Mode Management (`UserFacingModes.kt`)
 - **Lifecycle**: Therapeutic modes (e.g., Active Heartbeat) are intentionally reset on app launch for safety.
 
-## Persistence (`SettingsManager.kt`)
+### Persistence (`SettingsManager.kt`)
 - **Scope**: Hardware preferences (Intensity, BPM, Timing, Thresholds) are persisted.
 - **Exclusion**: Active modes are NOT persisted.
 
