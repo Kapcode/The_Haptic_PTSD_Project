@@ -3,31 +3,38 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="8dp">
+    android:padding="8dp"
+    android:background="#1A1C1E">
 
-    <TextView
-        android:id="@+id/notification_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="The Haptic PTSD Project"
-        android:textStyle="bold"
-        android:textColor="#FFFFFF" />
-
-    <TextView
-        android:id="@+id/notification_text"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Detection Active"
-        android:textColor="#CCCCCC" />
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <TextView
+            android:id="@+id/notification_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="The Haptic PTSD Project"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp" />
+        <TextView
+            android:id="@+id/notification_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/notification_title"
+            android:text="Detection Active"
+            android:textColor="#CCCCCC"
+            android:textSize="12sp" />
+    </RelativeLayout>
 
     <LinearLayout
+        android:id="@+id/visualizer_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="horizontal"
         android:layout_marginTop="8dp">
 
-        <!-- Phone Left (Outside) -->
         <ImageView
             android:id="@+id/img_phone_left"
             android:layout_width="32dp"
@@ -35,7 +42,6 @@
             android:src="@drawable/phone_left_on"
             android:layout_marginEnd="8dp" />
 
-        <!-- Controller Left (Inside - Split Top/Bottom) -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -53,7 +59,6 @@
                 android:src="@drawable/controller_left_on" />
         </LinearLayout>
 
-        <!-- Controller Right (Inside - Split Top/Bottom) -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -71,13 +76,89 @@
                 android:src="@drawable/controller_right_on" />
         </LinearLayout>
 
-        <!-- Phone Right (Outside) -->
         <ImageView
             android:id="@+id/img_phone_right"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:src="@drawable/phone_right_on"
             android:layout_marginStart="8dp" />
+    </LinearLayout>
 
+    <!-- BBPlayer Controls (Visible when playing) -->
+    <LinearLayout
+        android:id="@+id/player_controls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="8dp"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:id="@+id/player_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginBottom="4dp"
+            android:progressDrawable="@android:drawable/progress_horizontal" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/btn_replay_30"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@android:drawable/ic_media_rew"
+                android:padding="4dp"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="Replay 30s" />
+
+            <ImageView
+                android:id="@+id/btn_replay_5"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@android:drawable/ic_media_previous"
+                android:padding="4dp"
+                android:layout_marginEnd="12dp"
+                android:contentDescription="Replay 5s" />
+
+            <ImageView
+                android:id="@+id/btn_play_pause"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@android:drawable/ic_media_play"
+                android:padding="4dp"
+                android:contentDescription="Play/Pause" />
+
+            <ImageView
+                android:id="@+id/btn_stop"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                android:padding="4dp"
+                android:contentDescription="Stop" />
+
+            <ImageView
+                android:id="@+id/btn_forward_5"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@android:drawable/ic_media_next"
+                android:padding="4dp"
+                android:layout_marginStart="12dp"
+                android:contentDescription="Forward 5s" />
+
+            <ImageView
+                android:id="@+id/btn_forward_30"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@android:drawable/ic_media_ff"
+                android:padding="4dp"
+                android:layout_marginStart="8dp"
+                android:contentDescription="Forward 30s" />
+
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

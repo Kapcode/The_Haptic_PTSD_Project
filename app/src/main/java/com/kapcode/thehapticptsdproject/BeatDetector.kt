@@ -48,6 +48,7 @@ data class HapticProfile(
 
 data class BeatPlayerState(
     val isPlaying: Boolean = false,
+    val isPaused: Boolean = false,
     val isAnalyzing: Boolean = false,
     val analysisProgress: Float = 0f,
     val analysisFileIndex: Int = 0,
@@ -340,37 +341,81 @@ object BeatDetector {
 
         _playerState.update { it.copy(
             isPlaying = true,
+            isPaused = false,
             totalDurationMs = mediaPlayer?.duration?.toLong() ?: 0L,
             nextBeatIndex = 0
         ) }
 
+        startPlaybackJob()
+    }
+
+    private fun startPlaybackJob() {
+        playbackJob?.cancel()
         playbackJob = CoroutineScope(Dispatchers.Default).launch {
-            while (mediaPlayer?.isPlaying == true) {
-                val currentPos = mediaPlayer?.currentPosition?.toLong() ?: 0L
-                
-                var beatToTrigger: DetectedBeat? = null
-                
-                _playerState.update { state ->
-                    val nextIndex = state.nextBeatIndex
-                    if (nextIndex < state.detectedBeats.size) {
-                        val beat = state.detectedBeats[nextIndex]
-                        if (currentPos >= beat.timestampMs) {
-                            beatToTrigger = beat
-                            state.copy(currentTimestampMs = currentPos, nextBeatIndex = nextIndex + 1)
+            while (isActive) {
+                if (mediaPlayer?.isPlaying == true) {
+                    val currentPos = mediaPlayer?.currentPosition?.toLong() ?: 0L
+                    
+                    var beatToTrigger: DetectedBeat? = null
+                    
+                    _playerState.update { state ->
+                        val nextIndex = state.nextBeatIndex
+                        if (nextIndex < state.detectedBeats.size) {
+                            val beat = state.detectedBeats[nextIndex]
+                            if (currentPos >= beat.timestampMs) {
+                                beatToTrigger = beat
+                                state.copy(currentTimestampMs = currentPos, nextBeatIndex = nextIndex + 1)
+                            } else {
+                                state.copy(currentTimestampMs = currentPos)
+                            }
                         } else {
                             state.copy(currentTimestampMs = currentPos)
                         }
-                    } else {
-                        state.copy(currentTimestampMs = currentPos)
                     }
+                    
+                    beatToTrigger?.let { triggerBeatHaptic(it) }
                 }
-                
-                beatToTrigger?.let { triggerBeatHaptic(it) }
-                
                 delay(5)
             }
-            stopPlayback()
         }
+    }
+
+    fun pausePlayback() {
+        mediaPlayer?.pause()
+        _playerState.update { it.copy(isPlaying = false, isPaused = true) }
+    }
+
+    fun resumePlayback() {
+        mediaPlayer?.start()
+        _playerState.update { state ->
+            state.copy(
+                isPlaying = true,
+                isPaused = false,
+                nextBeatIndex = findNextBeatIndex(state.detectedBeats, state.currentTimestampMs)
+            )
+        }
+    }
+
+    fun seekTo(timestampMs: Long) {
+        mediaPlayer?.let { mp ->
+            val coercedTime = timestampMs.coerceIn(0, _playerState.value.totalDurationMs)
+            mp.seekTo(coercedTime.toInt())
+            
+            _playerState.update { state ->
+                state.copy(
+                    currentTimestampMs = coercedTime,
+                    nextBeatIndex = findNextBeatIndex(state.detectedBeats, coercedTime)
+                )
+            }
+        }
+    }
+
+    fun skipForward(seconds: Int) {
+        seekTo(_playerState.value.currentTimestampMs + (seconds * 1000))
+    }
+
+    fun skipBackward(seconds: Int) {
+        seekTo(_playerState.value.currentTimestampMs - (seconds * 1000))
     }
 
     private fun triggerBeatHaptic(beat: DetectedBeat) {
@@ -388,7 +433,12 @@ object BeatDetector {
         mediaPlayer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null
-        _playerState.update { it.copy(isPlaying = false) }
+        _playerState.update { it.copy(
+            isPlaying = false, 
+            isPaused = false,
+            currentTimestampMs = 0,
+            nextBeatIndex = 0
+        ) }
     }
 
     fun saveProfile(context: Context, parentTreeUri: Uri, audioFileName: String, profile: BeatProfile, beats: List<DetectedBeat>) {

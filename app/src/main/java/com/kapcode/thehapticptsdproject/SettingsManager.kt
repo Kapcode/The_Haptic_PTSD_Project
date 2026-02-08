@@ -2,14 +2,20 @@ package com.kapcode.thehapticptsdproject
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 
 object SettingsManager {
     private const val PREFS_NAME = "haptic_ptsd_prefs"
     
     private lateinit var prefs: SharedPreferences
 
+    private val _authorizedFolderUrisState = mutableStateOf<Set<String>>(emptySet())
+    val authorizedFolderUrisState: State<Set<String>> = _authorizedFolderUrisState
+
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        _authorizedFolderUrisState.value = prefs.getStringSet("authorized_folder_uris", emptySet()) ?: emptySet()
     }
 
     // Squeeze Settings
@@ -60,6 +66,35 @@ object SettingsManager {
         get() = prefs.getFloat("media_volume", 1.0f)
         set(value) = prefs.edit().putFloat("media_volume", value).apply()
 
+    // Snap Settings
+    var snapIntensity: Float
+        get() = prefs.getFloat("snap_intensity", 0f)
+        set(value) = prefs.edit().putFloat("snap_intensity", value).apply()
+
+    var snapBpm: Float
+        get() = prefs.getFloat("snap_bpm", 0f)
+        set(value) = prefs.edit().putFloat("snap_bpm", value).apply()
+
+    var snapDuration: Float
+        get() = prefs.getFloat("snap_duration", 0f)
+        set(value) = prefs.edit().putFloat("snap_duration", value).apply()
+
+    var snapVolume: Float
+        get() = prefs.getFloat("snap_volume", 0.02f) // Default 2%
+        set(value) = prefs.edit().putFloat("snap_volume", value).apply()
+
+    var snapSqueeze: Float
+        get() = prefs.getFloat("snap_squeeze", 0f)
+        set(value) = prefs.edit().putFloat("snap_squeeze", value).apply()
+
+    var snapShake: Float
+        get() = prefs.getFloat("snap_shake", 0f)
+        set(value) = prefs.edit().putFloat("snap_shake", value).apply()
+
+    var snapBeatMaxIntensity: Float
+        get() = prefs.getFloat("snap_beat_max_intensity", 0f)
+        set(value) = prefs.edit().putFloat("snap_beat_max_intensity", value).apply()
+
     // Logging
     var logToLogcat: Boolean
         get() = prefs.getBoolean("log_to_logcat", false)
@@ -67,6 +102,9 @@ object SettingsManager {
 
     // Authorized Media Folders (SAF URIs)
     var authorizedFolderUris: Set<String>
-        get() = prefs.getStringSet("authorized_folder_uris", emptySet()) ?: emptySet()
-        set(value) = prefs.edit().putStringSet("authorized_folder_uris", value).apply()
+        get() = _authorizedFolderUrisState.value
+        set(value) {
+            prefs.edit().putStringSet("authorized_folder_uris", value).apply()
+            _authorizedFolderUrisState.value = value
+        }
 }

@@ -14,6 +14,9 @@ import android.hardware.SensorManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.widget.RemoteViews
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
@@ -29,6 +32,7 @@ class HapticService : Service(), SensorEventListener {
     private var wakeLock: PowerManager.WakeLock? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var visualizerRefreshJob: Job? = null
+    private var vibrator: Vibrator? = null
 
     private var isSqueezeEnabled = false
     private var isShakeEnabled = false
@@ -43,13 +47,24 @@ class HapticService : Service(), SensorEventListener {
         
         const val ACTION_START = "ACTION_START"
         const val ACTION_STOP = "ACTION_STOP"
+        const val ACTION_PAUSE = "ACTION_PAUSE"
+        const val ACTION_PLAY = "ACTION_PLAY"
         const val ACTION_UPDATE_MODES = "ACTION_UPDATE_MODES"
+        const val ACTION_VIBRATE = "ACTION_VIBRATE"
+        const val ACTION_CANCEL_VIBRATION = "ACTION_CANCEL_VIBRATION"
+        
+        const val ACTION_SKIP_BWD_30 = "ACTION_SKIP_BWD_30"
+        const val ACTION_SKIP_BWD_5 = "ACTION_SKIP_BWD_5"
+        const val ACTION_SKIP_FWD_5 = "ACTION_SKIP_FWD_5"
+        const val ACTION_SKIP_FWD_30 = "ACTION_SKIP_FWD_30"
         
         const val EXTRA_SQUEEZE_ENABLED = "EXTRA_SQUEEZE_ENABLED"
         const val EXTRA_SHAKE_ENABLED = "EXTRA_SHAKE_ENABLED"
         const val EXTRA_SHAKE_THRESHOLD = "EXTRA_SHAKE_THRESHOLD"
         const val EXTRA_BB_PLAYER_ACTIVE = "EXTRA_BB_PLAYER_ACTIVE"
         const val EXTRA_HEARTBEAT_ACTIVE = "EXTRA_HEARTBEAT_ACTIVE"
+        const val EXTRA_DURATION = "EXTRA_DURATION"
+        const val EXTRA_AMPLITUDE = "EXTRA_AMPLITUDE"
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -57,6 +72,9 @@ class HapticService : Service(), SensorEventListener {
         super.onCreate()
         HapticManager.init(this)
         SettingsManager.init(this)
+
+        val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+        vibrator = vibratorManager.defaultVibrator
 
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
@@ -98,6 +116,7 @@ class HapticService : Service(), SensorEventListener {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
@@ -114,23 +133,56 @@ class HapticService : Service(), SensorEventListener {
                 isHeartbeatModeActive = intent.getBooleanExtra(EXTRA_HEARTBEAT_ACTIVE, false)
                 updateNotification(HapticManager.state.value, BeatDetector.playerState.value)
             }
+            ACTION_PAUSE -> {
+                BeatDetector.pausePlayback()
+                updateNotification(HapticManager.state.value, BeatDetector.playerState.value)
+            }
+            ACTION_PLAY -> {
+                BeatDetector.resumePlayback()
+                updateNotification(HapticManager.state.value, BeatDetector.playerState.value)
+            }
+            ACTION_SKIP_BWD_30 -> BeatDetector.skipBackward(30)
+            ACTION_SKIP_BWD_5 -> BeatDetector.skipBackward(5)
+            ACTION_SKIP_FWD_5 -> BeatDetector.skipForward(5)
+            ACTION_SKIP_FWD_30 -> BeatDetector.skipForward(30)
             ACTION_STOP -> {
-                stopSelf()
+                if (BeatDetector.playerState.value.isPlaying || BeatDetector.playerState.value.isPaused) {
+                    BeatDetector.stopPlayback()
+                } else {
+                    stopSelf()
+                }
+            }
+            ACTION_VIBRATE -> {
+                val duration = intent.getLongExtra(EXTRA_DURATION, 100L)
+                val amplitude = intent.getIntExtra(EXTRA_AMPLITUDE, 255)
+                playVibration(duration, amplitude)
+            }
+            ACTION_CANCEL_VIBRATION -> {
+                vibrator?.cancel()
             }
         }
         return START_STICKY
+    }
+    
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun playVibration(durationMs: Long, amplitude: Int) {
+        vibrator?.vibrate(VibrationEffect.createOneShot(durationMs, amplitude))
     }
 
     private fun updateNotification(hState: HapticState, bState: BeatPlayerState) {
         val title = when {
             hState.isHeartbeatRunning -> "Heartbeat Active"
-            bState.isPlaying -> "Bilateral Beats Playing"
+            bState.isPlaying || bState.isPaused -> "Bilateral Beats Player"
             else -> "Haptic PTSD Monitoring"
         }
         
         val text = when {
             hState.isHeartbeatRunning -> "Soothe Session: ${hState.remainingSeconds}s remaining"
-            bState.isPlaying -> "Sync Playing: ${bState.currentTimestampMs/1000}s / ${bState.totalDurationMs/1000}s"
+            bState.isPlaying || bState.isPaused -> {
+                val cur = bState.currentTimestampMs / 1000
+                val tot = bState.totalDurationMs / 1000
+                "Sync: ${cur/60}:${(cur%60).toString().padStart(2, '0')} / ${tot/60}:${(tot%60).toString().padStart(2, '0')}"
+            }
             else -> {
                 val modes = mutableListOf<String>()
                 if (isHeartbeatModeActive) modes.add("Heartbeat")
@@ -145,7 +197,6 @@ class HapticService : Service(), SensorEventListener {
             
             val minAlpha = 40 
             val maxAlpha = 255
-            
             fun getAlpha(intensity: Float) = (minAlpha + (intensity * (maxAlpha - minAlpha))).toInt()
 
             setInt(R.id.img_phone_left, "setAlpha", getAlpha(hState.phoneLeftIntensity))
@@ -162,26 +213,48 @@ class HapticService : Service(), SensorEventListener {
             setImageViewResource(R.id.img_controller_left_bottom, if (hState.controllerLeftBottomIntensity > 0.01f) R.drawable.controller_left_on else R.drawable.controller_left_off)
             setImageViewResource(R.id.img_controller_right_top, if (hState.controllerRightTopIntensity > 0.01f) R.drawable.controller_right_on else R.drawable.controller_right_off)
             setImageViewResource(R.id.img_controller_right_bottom, if (hState.controllerRightBottomIntensity > 0.01f) R.drawable.controller_right_on else R.drawable.controller_right_off)
+
+            if (bState.isPlaying || bState.isPaused) {
+                setViewVisibility(R.id.player_controls, android.view.View.VISIBLE)
+                setProgressBar(R.id.player_progress, bState.totalDurationMs.toInt(), bState.currentTimestampMs.toInt(), false)
+                
+                val ppIcon = if (bState.isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+                val ppAction = if (bState.isPlaying) ACTION_PAUSE else ACTION_PLAY
+                setImageViewResource(R.id.btn_play_pause, ppIcon)
+                setOnClickPendingIntent(R.id.btn_play_pause, createPendingAction(ppAction))
+                setImageViewResource(R.id.btn_stop, android.R.drawable.ic_menu_close_clear_cancel)
+                setOnClickPendingIntent(R.id.btn_stop, createPendingAction(ACTION_STOP))
+                
+                setOnClickPendingIntent(R.id.btn_replay_30, createPendingAction(ACTION_SKIP_BWD_30))
+                setOnClickPendingIntent(R.id.btn_replay_5, createPendingAction(ACTION_SKIP_BWD_5))
+                setOnClickPendingIntent(R.id.btn_forward_5, createPendingAction(ACTION_SKIP_FWD_5))
+                setOnClickPendingIntent(R.id.btn_forward_30, createPendingAction(ACTION_SKIP_FWD_30))
+            } else {
+                setViewVisibility(R.id.player_controls, android.view.View.GONE)
+            }
         }
 
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+        val mainIntent = Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_SINGLE_TOP }
+        val pendingIntent = PendingIntent.getActivity(this, 0, mainIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setCustomContentView(remoteViews)
+            .setCustomBigContentView(remoteViews)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
 
-        startForeground(NOTIFICATION_ID, notification)
+        notificationBuilder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+
+        startForeground(NOTIFICATION_ID, notificationBuilder.build())
+    }
+
+    private fun createPendingAction(action: String): PendingIntent {
+        val intent = Intent(this, HapticService::class.java).apply { this.action = action }
+        return PendingIntent.getService(this, action.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
     }
 
     private fun acquireWakeLock() {
@@ -230,15 +303,13 @@ class HapticService : Service(), SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val serviceChannel = NotificationChannel(
-                CHANNEL_ID,
-                "Haptic PTSD Monitoring",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(serviceChannel)
-        }
+        val serviceChannel = NotificationChannel(
+            CHANNEL_ID,
+            "Haptic PTSD Monitoring",
+            NotificationManager.IMPORTANCE_HIGH
+        )
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(serviceChannel)
     }
 
     override fun onDestroy() {

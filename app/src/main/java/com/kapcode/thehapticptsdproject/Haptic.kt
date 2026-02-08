@@ -1,11 +1,8 @@
 package com.kapcode.thehapticptsdproject
 
 import android.content.Context
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
-import androidx.annotation.RequiresApi
+import android.content.Intent
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,23 +36,14 @@ object HapticManager {
     private var sessionJob: Job? = null
     private var testJob: Job? = null
     private var visualizerResetJob: Job? = null
-    private var vibrator: Vibrator? = null
+    private lateinit var context: Context
 
     fun init(context: Context) {
-        if (vibrator != null) return
-        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            vibratorManager.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        }
-        
+        this.context = context.applicationContext
         _state.value = _state.value.copy(
             leadInMs = SettingsManager.hapticLeadInMs,
             leadOutMs = SettingsManager.hapticLeadOutMs
         )
-        
         startVisualizerResetLoop()
     }
 
@@ -65,10 +53,10 @@ object HapticManager {
             while (isActive) {
                 delay(50)
                 val current = _state.value
-                if (current.phoneLeftIntensity > 0 || current.phoneRightIntensity > 0 || 
+                if (current.phoneLeftIntensity > 0 || current.phoneRightIntensity > 0 ||
                     current.controllerLeftTopIntensity > 0 || current.controllerLeftBottomIntensity > 0 ||
                     current.controllerRightTopIntensity > 0 || current.controllerRightBottomIntensity > 0) {
-                    
+
                     _state.value = current.copy(
                         phoneLeftIntensity = (current.phoneLeftIntensity - 0.1f).coerceAtLeast(0f),
                         phoneRightIntensity = (current.phoneRightIntensity - 0.1f).coerceAtLeast(0f),
@@ -113,7 +101,6 @@ object HapticManager {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     fun startHeartbeatSession() {
         if (_state.value.isHeartbeatRunning) {
             _state.value = _state.value.copy(remainingSeconds = _state.value.sessionDurationSeconds)
@@ -152,10 +139,9 @@ object HapticManager {
         if (!_state.value.isHeartbeatRunning) return
         _state.value = _state.value.copy(isHeartbeatRunning = false, remainingSeconds = 0)
         sessionJob?.cancel()
-        vibrator?.cancel()
+        sendIntentToService(HapticService.ACTION_CANCEL_VIBRATION)
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     fun testPulseSequence() {
         if (_state.value.isTestRunning || _state.value.isHeartbeatRunning) return
         
@@ -172,18 +158,23 @@ object HapticManager {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
+    fun playRawVibration(durationMs: Long, amplitude: Int) {
+        sendIntentToService(HapticService.ACTION_VIBRATE) {
+            putExtra(HapticService.EXTRA_DURATION, durationMs)
+            putExtra(HapticService.EXTRA_AMPLITUDE, amplitude)
+        }
+    }
+    
     fun playPulse(intensityOverride: Float? = null, durationMs: Long = 100L, channel: Int = 2) {
         val intensity = intensityOverride ?: _state.value.intensity
         val strength = (255 * intensity).toInt().coerceIn(1, 255)
-        val s = _state.value
         
         CoroutineScope(Dispatchers.Default).launch {
             updateVisuals(intensity, channel)
-            delay(s.leadInMs.toLong())
-            vibrator?.vibrate(VibrationEffect.createOneShot(durationMs, strength))
+            delay(state.value.leadInMs.toLong())
+            playRawVibration(durationMs, strength)
             delay(durationMs)
-            delay(s.leadOutMs.toLong())
+            delay(state.value.leadOutMs.toLong())
         }
     }
 
@@ -196,14 +187,12 @@ object HapticManager {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     fun playSingleHeartbeat() {
         CoroutineScope(Dispatchers.Default).launch {
             playHeartbeatPulse()
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun playHeartbeatPulse() {
         val s = _state.value
         val intensity = s.intensity
@@ -212,7 +201,7 @@ object HapticManager {
 
         updateVisuals(intensity, 2)
         delay(s.leadInMs.toLong())
-        vibrator?.vibrate(VibrationEffect.createOneShot(50, strength1))
+        playRawVibration(50, strength1)
         delay(50)
         delay(s.leadOutMs.toLong())
         
@@ -220,7 +209,7 @@ object HapticManager {
 
         updateVisuals(intensity * 0.7f, 2)
         delay(s.leadInMs.toLong())
-        vibrator?.vibrate(VibrationEffect.createOneShot(60, strength2))
+        playRawVibration(60, strength2)
         delay(60)
         delay(s.leadOutMs.toLong())
     }
@@ -233,5 +222,14 @@ object HapticManager {
             controllerRightTopIntensity = rightTop.coerceIn(0f, 1f),
             controllerRightBottomIntensity = rightBottom.coerceIn(0f, 1f)
         )
+    }
+
+    private fun sendIntentToService(action: String, extras: Intent.() -> Unit = {}) {
+        if (!::context.isInitialized) return
+        val intent = Intent(context, HapticService::class.java).apply {
+            this.action = action
+            extras()
+        }
+        ContextCompat.startForegroundService(context, intent)
     }
 }
