@@ -44,6 +44,10 @@ This document contains technical details, architectural decisions, and developme
 - **Optimization**: Intelligent downsampling (analyzing 1 in 4 samples) significantly reduces CPU load during profile generation.
 - **Background Processing**: Batch analysis handled by `AnalysisService.kt` with persistent progress notifications.
 
+### Intelligent Auto-Selection & Persistence
+- **Auto-Selection**: The `BeatPlayerViewModel` automatically selects a track on startup. It prioritizes analyzed files (choosing the shortest for convenience) and remembers the last played track as a fallback.
+- **Persistence**: Last played URI and Name are persisted in `SettingsManager`.
+
 ### File Tree Selection UI
 - **Implementation**: Lazy-loading folder/file browser using SAF (Storage Access Framework) URIs.
 - **Auto-loading**: Automatically scans for and loads existing haptic profiles (.json) when a track or profile type is selected.
@@ -68,7 +72,7 @@ This document contains technical details, architectural decisions, and developme
 - **Lifecycle**: Therapeutic modes (e.g., Active Heartbeat) are intentionally reset on app launch for safety.
 
 ### Persistence (`SettingsManager.kt`)
-- **Scope**: Hardware preferences (Intensity, BPM, Timing, Thresholds) are persisted.
+- **Scope**: Hardware preferences (Intensity, BPM, Timing, Thresholds) and last played media metadata are persisted.
 - **Exclusion**: Active modes are NOT persisted.
 
 ## Current Known Issues / Notes

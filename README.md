@@ -18,8 +18,11 @@ A primary therapeutic feature where the user activates a comforting, rhythmic "h
 ### Bilateral Beat Player
 Analyze any audio file from your library to generate a custom haptic profile. The app uses advanced signal processing to "feel" the music, providing synchronized tactile feedback that matches the intensity and duration of detected transients. Supports automatic caching for instant re-play.
 
+### Intelligent Auto-Selection
+The app automatically prepares your therapeutic environment by choosing the best available audio track. It prioritizes previously analyzed files (choosing the shortest ones for quick sessions) and remembers your last played track, ensuring support is always one tap away.
+
 ### Live Haptic Visualizer
-Real-time visual feedback of the haptic engine's output, available both as a dedicated card in the app and as part of a persistent notification. This provides clear confirmation of when the app is generating vibrations, featuring animations for both phone and external controller motors.
+Real-time visual feedback of the haptic engine's output, available both as a dedicated card in the app and as part of a persistent notification. This provides clear confirmation of when the app is generating vibrations, featuring animations for both phone and external motor motors.
 
 ### Notification Media Controls
 Full media playback controls are integrated directly into the persistent notification. This allows you to play, pause, stop, and skip forward or backward by 5 or 30 seconds without needing to open the app. The controls are synchronized with the in-app player.
