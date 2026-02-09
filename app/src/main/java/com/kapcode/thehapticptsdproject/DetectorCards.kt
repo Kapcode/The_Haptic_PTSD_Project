@@ -1,14 +1,34 @@
 package com.kapcode.thehapticptsdproject
 
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kapcode.thehapticptsdproject.composables.SectionCard
 import com.kapcode.thehapticptsdproject.composables.SliderWithTick
+
+@Composable
+fun DetectorCards() {
+    SqueezeDetectorCard(
+        isEnabled = SettingsManager.isSqueezeEnabled,
+        onToggle = { SettingsManager.isSqueezeEnabled = it; SettingsManager.save() },
+        isExperimental = true
+    )
+    Spacer(Modifier.height(16.dp))
+    ShakeDetectorCard(
+        isEnabled = SettingsManager.isShakeEnabled,
+        onToggle = { SettingsManager.isShakeEnabled = it; SettingsManager.save() },
+        sensitivity = SettingsManager.internalShakeThreshold,
+        onSensitivityChange = { SettingsManager.internalShakeThreshold = it; SettingsManager.save() }
+    )
+}
 
 @Composable
 fun SqueezeDetectorCard(

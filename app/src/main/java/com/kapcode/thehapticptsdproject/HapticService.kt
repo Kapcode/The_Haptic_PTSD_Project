@@ -27,7 +27,7 @@ import kotlin.math.sqrt
 
 class HapticService : Service(), SensorEventListener {
 
-    private lateinit var squeezeDetector: SqueezeDetector
+    private val squeezeDetector = SqueezeManager.detector
     private lateinit var sensorManager: SensorManager
     private var motionSensor: Sensor? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -80,7 +80,7 @@ class HapticService : Service(), SensorEventListener {
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
 
-        squeezeDetector = SqueezeDetector {
+        SqueezeManager.setOnSqueezeListener {
             triggerHaptics("Squeeze")
         }
         squeezeDetector.setSqueezeThreshold(SettingsManager.squeezeThreshold.toDouble())

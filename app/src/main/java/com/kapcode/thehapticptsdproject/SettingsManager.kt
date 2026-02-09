@@ -58,6 +58,10 @@ object SettingsManager {
     var triggerThresholdBass by mutableStateOf(0.48f)
     var triggerThresholdDrum by mutableStateOf(0.48f)
     var triggerThresholdGuitar by mutableStateOf(0.48f)
+    var scaleVibrationVisualizerX by mutableStateOf(1.0f)
+    var scaleVibrationVisualizerY by mutableStateOf(1.0f)
+    var scaleAudioVisualizerX by mutableStateOf(1.0f)
+    var scaleAudioVisualizerY by mutableStateOf(1.0f)
 
 
     // Experimental Switch
@@ -77,6 +81,8 @@ object SettingsManager {
     var snapSyncOffset by mutableStateOf(0f)
     var snapLatchDuration by mutableStateOf(0f)
     var snapTriggerThreshold by mutableStateOf(0f)
+    var snapScaleVibration by mutableStateOf(0f)
+    var snapScaleAudio by mutableStateOf(0f)
 
 
     // Logging
@@ -121,6 +127,10 @@ object SettingsManager {
         triggerThresholdBass = prefs.getFloat("trigger_threshold_bass", 0.48f)
         triggerThresholdDrum = prefs.getFloat("trigger_threshold_drum", 0.48f)
         triggerThresholdGuitar = prefs.getFloat("trigger_threshold_guitar", 0.48f)
+        scaleVibrationVisualizerX = prefs.getFloat("scale_vibration_visualizer_x", 1.0f)
+        scaleVibrationVisualizerY = prefs.getFloat("scale_vibration_visualizer_y", 1.0f)
+        scaleAudioVisualizerX = prefs.getFloat("scale_audio_visualizer_x", 1.0f)
+        scaleAudioVisualizerY = prefs.getFloat("scale_audio_visualizer_y", 1.0f)
         
         isExperimentalEnabled = prefs.getBoolean("experimental_enabled", false)
 
@@ -137,6 +147,8 @@ object SettingsManager {
         snapSyncOffset = prefs.getFloat("snap_sync_offset", 0f)
         snapLatchDuration = prefs.getFloat("snap_latch_duration", 0f)
         snapTriggerThreshold = prefs.getFloat("snap_trigger_threshold", 0f)
+        snapScaleVibration = prefs.getFloat("snap_scale_vibration", 0f)
+        snapScaleAudio = prefs.getFloat("snap_scale_audio", 0f)
 
         logToLogcat = prefs.getBoolean("log_to_logcat", false)
         authorizedFolderUris = prefs.getStringSet("authorized_folder_uris", emptySet()) ?: emptySet()
@@ -177,6 +189,10 @@ object SettingsManager {
             putFloat("trigger_threshold_bass", triggerThresholdBass)
             putFloat("trigger_threshold_drum", triggerThresholdDrum)
             putFloat("trigger_threshold_guitar", triggerThresholdGuitar)
+            putFloat("scale_vibration_visualizer_x", scaleVibrationVisualizerX)
+            putFloat("scale_vibration_visualizer_y", scaleVibrationVisualizerY)
+            putFloat("scale_audio_visualizer_x", scaleAudioVisualizerX)
+            putFloat("scale_audio_visualizer_y", scaleAudioVisualizerY)
             
             putBoolean("experimental_enabled", isExperimentalEnabled)
 
@@ -193,6 +209,8 @@ object SettingsManager {
             putFloat("snap_sync_offset", snapSyncOffset)
             putFloat("snap_latch_duration", snapLatchDuration)
             putFloat("snap_trigger_threshold", snapTriggerThreshold)
+            putFloat("snap_scale_vibration", snapScaleVibration)
+            putFloat("snap_scale_audio", snapScaleAudio)
             putBoolean("log_to_logcat", logToLogcat)
             putStringSet("authorized_folder_uris", authorizedFolderUris)
             apply()
@@ -231,6 +249,10 @@ object SettingsManager {
         triggerThresholdBass = 0.48f
         triggerThresholdDrum = 0.48f
         triggerThresholdGuitar = 0.48f
+        scaleVibrationVisualizerX = 1.0f
+        scaleVibrationVisualizerY = 1.0f
+        scaleAudioVisualizerX = 1.0f
+        scaleAudioVisualizerY = 1.0f
         
         isExperimentalEnabled = false
         
@@ -247,6 +269,8 @@ object SettingsManager {
         snapSyncOffset = 0f
         snapLatchDuration = 0f
         snapTriggerThreshold = 0f
+        snapScaleVibration = 0f
+        snapScaleAudio = 0f
         
         save()
     }

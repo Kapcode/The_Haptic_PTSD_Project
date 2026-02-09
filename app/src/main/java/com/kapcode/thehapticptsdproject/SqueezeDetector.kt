@@ -25,7 +25,18 @@ data class SqueezeDetectorState(
     val isCalibrating: Boolean = false
 )
 
-//TODO add a "Calibrating..." indicator to the UI card so the user knows to hold still?
+object SqueezeManager {
+    private var onSqueezeAction: (() -> Unit)? = null
+
+    val detector = SqueezeDetector {
+        onSqueezeAction?.invoke()
+    }
+
+    fun setOnSqueezeListener(action: () -> Unit) {
+        onSqueezeAction = action
+    }
+}
+
 class SqueezeDetector(
     private val onSqueezeDetected: () -> Unit
 ) {
