@@ -3,6 +3,7 @@ package com.kapcode.thehapticptsdproject
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -14,7 +15,8 @@ import kotlinx.coroutines.withContext
 class BeatPlayerViewModel : ViewModel() {
     val playerState = BeatDetector.playerState
     val selectedProfile = mutableStateOf(BeatProfile.AMPLITUDE)
-    val folderUris = SettingsManager.authorizedFolderUrisState
+    val folderUris: Set<String>
+        get() = SettingsManager.authorizedFolderUris
     val expandedFolderUri = mutableStateOf<Uri?>(null)
     val filesInExpandedFolder = mutableStateOf<List<Pair<String, Uri>>>(emptyList())
     val showAnalysisDialog = mutableStateOf(false)
@@ -70,26 +72,42 @@ class BeatPlayerViewModel : ViewModel() {
 
     fun analyzeSelectedAudio(context: Context) {
         val uri = playerState.value.selectedFileUri
-        val rootUri = folderUris.value.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
+        val name = playerState.value.selectedFileName
+        val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
+        
         if (uri != null && rootUri != null) {
-            viewModelScope.launch {
-                val result = BeatDetector.analyzeAudioUri(context, uri, selectedProfile.value)
-                if (result.isNotEmpty()) {
-                    BeatDetector.saveProfile(context, rootUri, playerState.value.selectedFileName, selectedProfile.value, result)
-                }
+            val intent = Intent(context, AnalysisService::class.java).apply {
+                putStringArrayListExtra(AnalysisService.EXTRA_FILE_URIS, arrayListOf(uri.toString()))
+                putStringArrayListExtra(AnalysisService.EXTRA_FILE_NAMES, arrayListOf(name))
+                putStringArrayListExtra(AnalysisService.EXTRA_PARENT_URIS, arrayListOf(rootUri.toString()))
+                putStringArrayListExtra(AnalysisService.EXTRA_PROFILES, arrayListOf(selectedProfile.value.name))
+            }
+            (context as? MainActivity)?.runWithNotificationPermission {
+                ContextCompat.startForegroundService(context, intent)
             }
         }
     }
 
     fun loadProfileForSelectedTrack(context: Context) {
         val uri = playerState.value.selectedFileUri
-        if (uri != null && (uri != lastLoadedUri.value || selectedProfile.value != lastLoadedProfile.value)) {
-            val rootUri = folderUris.value.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
+        val profile = selectedProfile.value
+        
+        if (uri != null && (uri != lastLoadedUri.value || profile != lastLoadedProfile.value)) {
+            val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
             if (rootUri != null) {
-                val existingProfileUri = BeatDetector.findExistingProfile(context, rootUri, playerState.value.selectedFileName, selectedProfile.value)
-                BeatDetector.loadProfile(context, existingProfileUri)
-                lastLoadedUri.value = uri
-                lastLoadedProfile.value = selectedProfile.value
+                val existingProfileUri = BeatDetector.findExistingProfile(context, rootUri, playerState.value.selectedFileName, profile)
+                if (existingProfileUri != null) {
+                    BeatDetector.loadProfile(context, existingProfileUri)
+                    lastLoadedUri.value = uri
+                    lastLoadedProfile.value = profile
+                } else {
+                    // No profile found, notify and auto-queue analysis
+                    Toast.makeText(context, "No haptic profile for ${profile.name}. Queuing analysis...", Toast.LENGTH_SHORT).show()
+                    analyzeSelectedAudio(context)
+                    // Mark as "loaded" so we don't spam queue requests for the same combo
+                    lastLoadedUri.value = uri
+                    lastLoadedProfile.value = profile
+                }
             }
         }
     }
@@ -105,7 +123,7 @@ class BeatPlayerViewModel : ViewModel() {
                 if (lastUriStr != null && lastName != null) {
                     val lastUri = Uri.parse(lastUriStr)
                     // Check if it belongs to an authorized folder
-                    val root = folderUris.value.find { lastUriStr.startsWith(it) }
+                    val root = folderUris.find { lastUriStr.startsWith(it) }
                     if (root != null) {
                         onFileSelected(lastUri, lastName)
                         return@withContext
@@ -116,7 +134,7 @@ class BeatPlayerViewModel : ViewModel() {
                 var bestFile: AnalysisFile? = null
                 var bestFolderUri: Uri? = null
 
-                for (folderUriStr in folderUris.value) {
+                for (folderUriStr in folderUris) {
                     val folderUri = Uri.parse(folderUriStr)
                     val files = getAudioFilesWithDetails(context, folderUri)
                     
@@ -147,6 +165,12 @@ class BeatPlayerViewModel : ViewModel() {
     }
 
     fun play(context: Context) {
+        if (playerState.value.detectedBeats.isEmpty()) {
+            Toast.makeText(context, "Waiting for audio analysis to complete...", Toast.LENGTH_SHORT).show()
+            // Analysis is likely already queued by loadProfileForSelectedTrack
+            return
+        }
+
         // Ensure the service is running so the notification is visible
         val intent = Intent(context, HapticService::class.java).apply {
             action = HapticService.ACTION_START

@@ -1,32 +1,28 @@
 package com.kapcode.thehapticptsdproject
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
-import androidx.activity.compose.ManagedActivityResultLauncher
-import androidx.activity.result.ActivityResult
 import androidx.lifecycle.ViewModel
 
 class MediaFoldersViewModel : ViewModel() {
-    val folderUris = SettingsManager.authorizedFolderUrisState
+    val authorizedFolderUris: Set<String>
+        get() = SettingsManager.authorizedFolderUris
 
-    fun onAddFolder(launcher: ManagedActivityResultLauncher<Uri?, ActivityResult>) {
-        launcher.launch(null)
-    }
-
-    fun onFolderAdded(context: Context, uri: Uri?) {
-        uri?.let {
+    fun addFolder(context: Context, uri: Uri) {
+        val current = SettingsManager.authorizedFolderUris
+        if (uri.toString() !in current) {
             context.contentResolver.takePersistableUriPermission(
-                it,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                uri,
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
-            val new = folderUris.value.toMutableSet().apply { add(it.toString()) }
-            SettingsManager.authorizedFolderUris = new
+            SettingsManager.authorizedFolderUris = current + uri.toString()
+            SettingsManager.save()
         }
     }
 
-    fun onRemoveFolder(uri: String) {
-        val new = folderUris.value.toMutableSet().apply { remove(uri) }
-        SettingsManager.authorizedFolderUris = new
+    fun removeFolder(uriString: String) {
+        val current = SettingsManager.authorizedFolderUris
+        SettingsManager.authorizedFolderUris = current - uriString
+        SettingsManager.save()
     }
 }

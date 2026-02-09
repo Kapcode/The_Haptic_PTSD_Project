@@ -2,9 +2,9 @@ package com.kapcode.thehapticptsdproject
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.net.Uri
-import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 enum class VisualizerType {
     VERTICAL_BARS,
@@ -14,117 +14,201 @@ enum class VisualizerType {
 
 object SettingsManager {
     private const val PREFS_NAME = "haptic_ptsd_prefs"
-    
     private lateinit var prefs: SharedPreferences
 
-    private val _authorizedFolderUrisState = mutableStateOf<Set<String>>(emptySet())
-    val authorizedFolderUrisState: State<Set<String>> = _authorizedFolderUrisState
+    // Squeeze Settings
+    var isSqueezeEnabled by mutableStateOf(false)
+    var squeezeThreshold by mutableStateOf(0.50f)
+
+    // Shake Settings
+    var isShakeEnabled by mutableStateOf(true)
+    var internalShakeThreshold by mutableStateOf(15f)
+
+    // Haptic Settings
+    var intensity by mutableStateOf(0.5f)
+    var bpm by mutableStateOf(60)
+    var sessionDurationSeconds by mutableStateOf(120)
+    var hapticLeadInMs by mutableStateOf(10)
+    var hapticLeadOutMs by mutableStateOf(10)
+    var hapticSyncOffsetMs by mutableStateOf(30)
+
+    // Beat Player Settings
+    var beatMaxIntensity by mutableStateOf(1.0f)
+    var mediaVolume by mutableStateOf(1.0f)
+    var lastPlayedAudioUri by mutableStateOf<String?>(null)
+    var lastPlayedAudioName by mutableStateOf<String?>(null)
+
+    // Visualizer Settings (Now individual layers)
+    var isBarsEnabled by mutableStateOf(true)
+    var isChannelIntensityEnabled by mutableStateOf(false)
+    var isWaveformEnabled by mutableStateOf(true)
+
+    var gainAmplitude by mutableStateOf(12f)
+    var gainBass by mutableStateOf(2.5f)
+    var gainDrum by mutableStateOf(2.2f)
+    var gainGuitar by mutableStateOf(1.8f)
+    var gainHighs by mutableStateOf(1.5f)
+    var visualizerTriggeredAlpha by mutableStateOf(0.1f)
+    var minIconAlpha by mutableStateOf(0.5f)
+
+    // Experimental Switch
+    var isExperimentalEnabled by mutableStateOf(false)
+
+    // Snap Settings
+    var snapIntensity by mutableStateOf(0f)
+    var snapBpm by mutableStateOf(0f)
+    var snapDuration by mutableStateOf(0f)
+    var snapVolume by mutableStateOf(0f)
+    var snapBeatMaxIntensity by mutableStateOf(0f)
+    var snapSqueeze by mutableStateOf(0f)
+    var snapShake by mutableStateOf(0f)
+    var snapGain by mutableStateOf(0f)
+    var snapTriggeredAlpha by mutableStateOf(0f)
+    var snapIconAlpha by mutableStateOf(0f)
+    var snapSyncOffset by mutableStateOf(0f)
+
+    // Logging
+    var logToLogcat by mutableStateOf(false)
+
+    // Authorized Media Folders
+    var authorizedFolderUris by mutableStateOf<Set<String>>(emptySet())
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        _authorizedFolderUrisState.value = prefs.getStringSet("authorized_folder_uris", emptySet()) ?: emptySet()
+        
+        isSqueezeEnabled = prefs.getBoolean("squeeze_enabled", false)
+        squeezeThreshold = prefs.getFloat("squeeze_threshold", 0.50f)
+        isShakeEnabled = prefs.getBoolean("shake_enabled", true)
+        internalShakeThreshold = prefs.getFloat("shake_threshold_internal", 15f)
+        intensity = prefs.getFloat("haptic_intensity", 0.5f)
+        bpm = prefs.getInt("haptic_bpm", 60)
+        sessionDurationSeconds = prefs.getInt("haptic_session_duration", 120)
+        hapticLeadInMs = prefs.getInt("haptic_lead_in", 10)
+        hapticLeadOutMs = prefs.getInt("haptic_lead_out", 10)
+        hapticSyncOffsetMs = prefs.getInt("haptic_sync_offset", 30)
+        beatMaxIntensity = prefs.getFloat("beat_max_intensity", 1.0f)
+        mediaVolume = prefs.getFloat("media_volume", 1.0f)
+        lastPlayedAudioUri = prefs.getString("last_played_audio_uri", null)
+        lastPlayedAudioName = prefs.getString("last_played_audio_name", null)
+        
+        isBarsEnabled = prefs.getBoolean("is_bars_enabled", true)
+        isChannelIntensityEnabled = prefs.getBoolean("is_channel_intensity_enabled", false)
+        isWaveformEnabled = prefs.getBoolean("is_waveform_enabled", true)
+
+        gainAmplitude = prefs.getFloat("gain_amplitude", 12f)
+        gainBass = prefs.getFloat("gain_bass", 2.5f)
+        gainDrum = prefs.getFloat("gain_drum", 2.2f)
+        gainGuitar = prefs.getFloat("gain_guitar", 1.8f)
+        gainHighs = prefs.getFloat("gain_highs", 1.5f)
+        visualizerTriggeredAlpha = prefs.getFloat("visualizer_triggered_alpha", 0.1f)
+        minIconAlpha = prefs.getFloat("min_icon_alpha", 0.5f)
+        
+        isExperimentalEnabled = prefs.getBoolean("experimental_enabled", false)
+
+        snapIntensity = prefs.getFloat("snap_intensity", 0f)
+        snapBpm = prefs.getFloat("snap_bpm", 0f)
+        snapDuration = prefs.getFloat("snap_duration", 0f)
+        snapVolume = prefs.getFloat("snap_volume", 0f)
+        snapBeatMaxIntensity = prefs.getFloat("snap_beat_max_intensity", 0f)
+        snapSqueeze = prefs.getFloat("snap_squeeze", 0f)
+        snapShake = prefs.getFloat("snap_shake", 0f)
+        snapGain = prefs.getFloat("snap_gain", 0f)
+        snapTriggeredAlpha = prefs.getFloat("snap_triggered_alpha", 0f)
+        snapIconAlpha = prefs.getFloat("snap_icon_alpha", 0f)
+        snapSyncOffset = prefs.getFloat("snap_sync_offset", 0f)
+        
+        logToLogcat = prefs.getBoolean("log_to_logcat", false)
+        authorizedFolderUris = prefs.getStringSet("authorized_folder_uris", emptySet()) ?: emptySet()
     }
 
-    // Squeeze Settings
-    var isSqueezeEnabled: Boolean
-        get() = prefs.getBoolean("squeeze_enabled", true)
-        set(value) = prefs.edit().putBoolean("squeeze_enabled", value).apply()
+    fun save() {
+        prefs.edit().apply {
+            putBoolean("squeeze_enabled", isSqueezeEnabled)
+            putFloat("squeeze_threshold", squeezeThreshold)
+            putBoolean("shake_enabled", isShakeEnabled)
+            putFloat("shake_threshold_internal", internalShakeThreshold)
+            putFloat("haptic_intensity", intensity)
+            putInt("haptic_bpm", bpm)
+            putInt("haptic_session_duration", sessionDurationSeconds)
+            putInt("haptic_lead_in", hapticLeadInMs)
+            putInt("haptic_lead_out", hapticLeadOutMs)
+            putInt("haptic_sync_offset", hapticSyncOffsetMs)
+            putFloat("beat_max_intensity", beatMaxIntensity)
+            putFloat("media_volume", mediaVolume)
+            putString("last_played_audio_uri", lastPlayedAudioUri)
+            putString("last_played_audio_name", lastPlayedAudioName)
+            
+            putBoolean("is_bars_enabled", isBarsEnabled)
+            putBoolean("is_channel_intensity_enabled", isChannelIntensityEnabled)
+            putBoolean("is_waveform_enabled", isWaveformEnabled)
 
-    var squeezeThreshold: Float
-        get() = prefs.getFloat("squeeze_threshold", 0.50f)
-        set(value) = prefs.edit().putFloat("squeeze_threshold", value).apply()
+            putFloat("gain_amplitude", gainAmplitude)
+            putFloat("gain_bass", gainBass)
+            putFloat("gain_drum", gainDrum)
+            putFloat("gain_guitar", gainGuitar)
+            putFloat("gain_highs", gainHighs)
+            putFloat("visualizer_triggered_alpha", visualizerTriggeredAlpha)
+            putFloat("min_icon_alpha", minIconAlpha)
+            
+            putBoolean("experimental_enabled", isExperimentalEnabled)
 
-    // Shake Settings
-    var isShakeEnabled: Boolean
-        get() = prefs.getBoolean("shake_enabled", true)
-        set(value) = prefs.edit().putBoolean("shake_enabled", value).apply()
-
-    var internalShakeThreshold: Float
-        get() = prefs.getFloat("shake_threshold_internal", 15f)
-        set(value) = prefs.edit().putFloat("shake_threshold_internal", value).apply()
-
-    // Haptic Settings
-    var intensity: Float
-        get() = prefs.getFloat("haptic_intensity", 0.5f)
-        set(value) = prefs.edit().putFloat("haptic_intensity", value).apply()
-
-    var bpm: Int
-        get() = prefs.getInt("haptic_bpm", 60)
-        set(value) = prefs.edit().putInt("haptic_bpm", value).apply()
-
-    var sessionDurationSeconds: Int
-        get() = prefs.getInt("haptic_session_duration", 120)
-        set(value) = prefs.edit().putInt("haptic_session_duration", value).apply()
-
-    var hapticLeadInMs: Int
-        get() = prefs.getInt("haptic_lead_in", 10)
-        set(value) = prefs.edit().putInt("haptic_lead_in", value).apply()
-
-    var hapticLeadOutMs: Int
-        get() = prefs.getInt("haptic_lead_out", 10)
-        set(value) = prefs.edit().putInt("haptic_lead_out", value).apply()
-
-    // Beat Player Settings
-    var beatMaxIntensity: Float
-        get() = prefs.getFloat("beat_max_intensity", 1.0f)
-        set(value) = prefs.edit().putFloat("beat_max_intensity", value).apply()
-        
-    var mediaVolume: Float
-        get() = prefs.getFloat("media_volume", 1.0f)
-        set(value) = prefs.edit().putFloat("media_volume", value).apply()
-
-    var lastPlayedAudioUri: String?
-        get() = prefs.getString("last_played_audio_uri", null)
-        set(value) = prefs.edit().putString("last_played_audio_uri", value).apply()
-
-    var lastPlayedAudioName: String?
-        get() = prefs.getString("last_played_audio_name", null)
-        set(value) = prefs.edit().putString("last_played_audio_name", value).apply()
-
-    // Visualizer Settings
-    var visualizerType: VisualizerType
-        get() = VisualizerType.valueOf(prefs.getString("visualizer_type", VisualizerType.VERTICAL_BARS.name) ?: VisualizerType.VERTICAL_BARS.name)
-        set(value) = prefs.edit().putString("visualizer_type", value.name).apply()
-
-    // Snap Settings
-    var snapIntensity: Float
-        get() = prefs.getFloat("snap_intensity", 0f)
-        set(value) = prefs.edit().putFloat("snap_intensity", value).apply()
-
-    var snapBpm: Float
-        get() = prefs.getFloat("snap_bpm", 0f)
-        set(value) = prefs.edit().putFloat("snap_bpm", value).apply()
-
-    var snapDuration: Float
-        get() = prefs.getFloat("snap_duration", 0f)
-        set(value) = prefs.edit().putFloat("snap_duration", value).apply()
-
-    var snapVolume: Float
-        get() = prefs.getFloat("snap_volume", 0.02f) // Default 2%
-        set(value) = prefs.edit().putFloat("snap_volume", value).apply()
-
-    var snapSqueeze: Float
-        get() = prefs.getFloat("snap_squeeze", 0f)
-        set(value) = prefs.edit().putFloat("snap_squeeze", value).apply()
-
-    var snapShake: Float
-        get() = prefs.getFloat("snap_shake", 0f)
-        set(value) = prefs.edit().putFloat("snap_shake", value).apply()
-
-    var snapBeatMaxIntensity: Float
-        get() = prefs.getFloat("snap_beat_max_intensity", 0f)
-        set(value) = prefs.edit().putFloat("snap_beat_max_intensity", value).apply()
-
-    // Logging
-    var logToLogcat: Boolean
-        get() = prefs.getBoolean("log_to_logcat", false)
-        set(value) = prefs.edit().putBoolean("log_to_logcat", value).apply()
-
-    // Authorized Media Folders (SAF URIs)
-    var authorizedFolderUris: Set<String>
-        get() = _authorizedFolderUrisState.value
-        set(value) {
-            prefs.edit().putStringSet("authorized_folder_uris", value).apply()
-            _authorizedFolderUrisState.value = value
+            putFloat("snap_intensity", snapIntensity)
+            putFloat("snap_bpm", snapBpm)
+            putFloat("snap_duration", snapDuration)
+            putFloat("snap_volume", snapVolume)
+            putFloat("snap_beat_max_intensity", snapBeatMaxIntensity)
+            putFloat("snap_squeeze", snapSqueeze)
+            putFloat("snap_shake", snapShake)
+            putFloat("snap_gain", snapGain)
+            putFloat("snap_triggered_alpha", snapTriggeredAlpha)
+            putFloat("snap_icon_alpha", snapIconAlpha)
+            putFloat("snap_sync_offset", snapSyncOffset)
+            putBoolean("log_to_logcat", logToLogcat)
+            putStringSet("authorized_folder_uris", authorizedFolderUris)
+            apply()
         }
+    }
+
+    fun resetToDefaults() {
+        isSqueezeEnabled = false
+        squeezeThreshold = 0.50f
+        isShakeEnabled = true
+        internalShakeThreshold = 15f
+        intensity = 0.5f
+        bpm = 60
+        sessionDurationSeconds = 120
+        hapticLeadInMs = 10
+        hapticLeadOutMs = 10
+        hapticSyncOffsetMs = 30
+        beatMaxIntensity = 1.0f
+        mediaVolume = 1.0f
+        
+        isBarsEnabled = true
+        isChannelIntensityEnabled = false
+        isWaveformEnabled = true
+
+        gainAmplitude = 12f
+        gainBass = 2.5f
+        gainDrum = 2.2f
+        gainGuitar = 1.8f
+        gainHighs = 1.5f
+        visualizerTriggeredAlpha = 0.1f
+        minIconAlpha = 0.5f
+        
+        isExperimentalEnabled = false
+        
+        snapIntensity = 0f
+        snapBpm = 0f
+        snapDuration = 0f
+        snapVolume = 0f
+        snapBeatMaxIntensity = 0f
+        snapSqueeze = 0f
+        snapShake = 0f
+        snapGain = 0f
+        snapTriggeredAlpha = 0f
+        snapIconAlpha = 0f
+        snapSyncOffset = 0f
+        
+        save()
+    }
 }

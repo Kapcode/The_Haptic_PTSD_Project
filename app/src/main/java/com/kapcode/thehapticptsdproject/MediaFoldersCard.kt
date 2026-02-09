@@ -14,7 +14,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,9 +25,9 @@ import com.kapcode.thehapticptsdproject.composables.SectionCard
 @Composable
 fun MediaFoldersCard(vm: MediaFoldersViewModel = viewModel()) {
     val context = LocalContext.current
-    val uris by vm.folderUris
+    val uris = vm.authorizedFolderUris
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        vm.onFolderAdded(context, uri)
+        if (uri != null) vm.addFolder(context, uri)
     }
     SectionCard(
         title = "Media Folders",
@@ -45,7 +44,7 @@ fun MediaFoldersCard(vm: MediaFoldersViewModel = viewModel()) {
                         .weight(1f)
                         .padding(start = 8.dp)
                 )
-                IconButton(onClick = { vm.onRemoveFolder(u) }) {
+                IconButton(onClick = { vm.removeFolder(u) }) {
                     Icon(
                         Icons.Default.Delete,
                         null,

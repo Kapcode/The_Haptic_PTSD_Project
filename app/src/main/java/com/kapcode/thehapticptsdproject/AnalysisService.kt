@@ -10,9 +10,9 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
-import android.provider.DocumentsContract
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 
 class AnalysisService : Service() {
 
@@ -22,6 +22,16 @@ class AnalysisService : Service() {
     private lateinit var notificationManager: NotificationManager
     private lateinit var notificationBuilder: NotificationCompat.Builder
 
+    private val taskChannel = Channel<AnalysisTask>(Channel.UNLIMITED)
+    private var isProcessing = false
+
+    data class AnalysisTask(
+        val fileUri: Uri,
+        val fileName: String,
+        val parentUri: Uri,
+        val profile: BeatProfile
+    )
+
     override fun onCreate() {
         super.onCreate()
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -30,6 +40,51 @@ class AnalysisService : Service() {
             .setContentTitle("Haptic Analysis")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
+
+        startTaskProcessor()
+    }
+
+    private fun startTaskProcessor() {
+        scope.launch {
+            for (task in taskChannel) {
+                isProcessing = true
+                processTask(task)
+                isProcessing = false
+                
+                // If channel is empty after a task, we could potentially stopSelf() 
+                // but we rely on START_STICKY and manual stop for now.
+                // Actually, let's check if we should stop.
+                if (taskChannel.isEmpty) {
+                    stopForeground(STOP_FOREGROUND_DETACH)
+                    // We don't stopSelf immediately to allow more tasks to come in 
+                    // without recreating the service if they are close together.
+                }
+            }
+        }
+    }
+
+    private suspend fun processTask(task: AnalysisTask) {
+        val retriever = MediaMetadataRetriever()
+        var duration = 0L
+        try {
+            contentResolver.openFileDescriptor(task.fileUri, "r")?.use { pfd ->
+                retriever.setDataSource(pfd.fileDescriptor)
+                duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: 0L
+            }
+        } catch (e: Exception) { }
+        finally {
+            try { retriever.release() } catch (e: Exception) {}
+        }
+
+        BeatDetector.setBatchProgress(1, 1, formatDuration(duration), duration)
+        updateNotification("Analyzing: ${task.fileName} (${task.profile.name})", 0, 1)
+
+        val beats = BeatDetector.analyzeAudioUri(this@AnalysisService, task.fileUri, task.profile)
+        if (beats.isNotEmpty()) {
+            BeatDetector.saveProfile(this@AnalysisService, task.parentUri, task.fileName, task.profile, beats)
+        }
+        
+        BeatDetector.setBatchProgress(0, 0, "", 0)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -38,85 +93,26 @@ class AnalysisService : Service() {
             return START_NOT_STICKY
         }
 
-        val fileUris = intent?.getStringArrayListExtra(EXTRA_FILE_URIS)?.map { Uri.parse(it) } ?: return START_NOT_STICKY
-        val fileNames = intent.getStringArrayListExtra(EXTRA_FILE_NAMES) ?: return START_NOT_STICKY
-        val parentUris = intent.getStringArrayListExtra(EXTRA_PARENT_URIS)?.map { Uri.parse(it) } ?: return START_NOT_STICKY
-        
-        val profileNames = intent.getStringArrayListExtra(EXTRA_PROFILES) ?: return START_NOT_STICKY
-        val profiles = profileNames.map { BeatProfile.valueOf(it) }
+        val fileUris = intent?.getStringArrayListExtra(EXTRA_FILE_URIS)?.map { Uri.parse(it) }
+        val fileNames = intent?.getStringArrayListExtra(EXTRA_FILE_NAMES)
+        val parentUris = intent?.getStringArrayListExtra(EXTRA_PARENT_URIS)?.map { Uri.parse(it) }
+        val profileNames = intent?.getStringArrayListExtra(EXTRA_PROFILES)
 
-        startForeground(NOTIFICATION_ID, createNotification("Starting analysis...", 0, 0))
-
-        scope.launch {
-            val retriever = MediaMetadataRetriever()
+        if (fileUris != null && fileNames != null && parentUris != null && profileNames != null) {
+            startForeground(NOTIFICATION_ID, createNotification("Queuing analysis tasks...", 0, 0))
             
-            // Calculate total initial duration for remaining time tracking
-            var totalRemainingMs = 0L
-            val fileDurations = LongArray(fileUris.size)
-            
-            for (i in fileUris.indices) {
-                var duration = 0L
-                try {
-                    contentResolver.openFileDescriptor(fileUris[i], "r")?.use { pfd ->
-                        retriever.setDataSource(pfd.fileDescriptor)
-                        duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: 0L
+            scope.launch {
+                for (i in fileUris.indices) {
+                    for (pName in profileNames) {
+                        taskChannel.send(AnalysisTask(
+                            fileUris[i],
+                            fileNames[i],
+                            parentUris[i],
+                            BeatProfile.valueOf(pName)
+                        ))
                     }
-                } catch (e: Exception) { }
-                fileDurations[i] = duration
-                totalRemainingMs += duration * profiles.size // Total work including profiles
-            }
-
-            val totalTasks = fileUris.size * profiles.size
-            var tasksProcessed = 0
-
-            for (i in fileUris.indices) {
-                if (!isActive) break
-                val fileUri = fileUris[i]
-                val fileName = fileNames[i]
-                val parentUri = parentUris[i]
-                val fileDuration = fileDurations[i]
-                
-                for (profile in profiles) {
-                    if (!isActive) break
-                    val currentTaskNum = tasksProcessed + 1
-                    
-                    // Update detector state with current task info and total remaining audio duration
-                    BeatDetector.setBatchProgress(
-                        currentTaskNum, 
-                        totalTasks, 
-                        formatDuration(fileDuration),
-                        totalRemainingMs
-                    )
-                    
-                    val remainingText = formatDuration(totalRemainingMs)
-                    val notificationText = "($currentTaskNum/$totalTasks) ~ $remainingText left. Analyzing: $fileName"
-                    updateNotification(notificationText, tasksProcessed, totalTasks)
-                    
-                    val beats = BeatDetector.analyzeAudioUri(this@AnalysisService, fileUri, profile)
-                    if (beats.isNotEmpty()) {
-                        BeatDetector.saveProfile(this@AnalysisService, parentUri, fileName, profile, beats)
-                    }
-                    
-                    tasksProcessed++
-                    totalRemainingMs -= fileDuration // Subtract duration of ONE profile task
                 }
             }
-            
-            try { retriever.release() } catch (e: Exception) { }
-
-            if (isActive) {
-                BeatDetector.setBatchProgress(0, 0, "", 0)
-                val completionText = "Batch analysis complete. $tasksProcessed tasks finished."
-                notificationManager.notify(NOTIFICATION_ID, 
-                    notificationBuilder
-                        .setContentText(completionText)
-                        .setProgress(0, 0, false)
-                        .setOngoing(false)
-                        .build()
-                )
-            }
-            stopForeground(STOP_FOREGROUND_DETACH)
-            stopSelf()
         }
 
         return START_STICKY
@@ -133,6 +129,7 @@ class AnalysisService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        taskChannel.close()
         job.cancel()
     }
 

@@ -23,10 +23,10 @@ import kotlinx.coroutines.withContext
 @Composable
 fun BackgroundAnalysisDialog(onDismiss: () -> Unit, onStart: (List<Triple<Uri, String, Uri>>, Set<BeatProfile>) -> Unit) {
     val context = LocalContext.current
-    val folderUris by SettingsManager.authorizedFolderUrisState
+    val folderUris = SettingsManager.authorizedFolderUris
     var allFiles by remember { mutableStateOf<List<AnalysisFile>>(emptyList()) }
     var selectedFileUris by remember { mutableStateOf(setOf<Uri>()) }
-    var selectedProfiles by remember { mutableStateOf(BeatProfile.values().toSet()) }
+    var selectedProfiles by remember { mutableStateOf(BeatProfile.entries.toSet()) }
     var isScanning by remember { mutableStateOf(true) }
     var analyzedMap by remember { mutableStateOf<Map<Pair<Uri, BeatProfile>, Boolean>>(emptyMap()) }
     
@@ -42,7 +42,7 @@ fun BackgroundAnalysisDialog(onDismiss: () -> Unit, onStart: (List<Triple<Uri, S
             
             val statusMap = mutableMapOf<Pair<Uri, BeatProfile>, Boolean>()
             files.forEach { file ->
-                BeatProfile.values().forEach { profile ->
+                BeatProfile.entries.forEach { profile ->
                     statusMap[file.uri to profile] = BeatDetector.findExistingProfile(context, file.parentUri, file.name, profile) != null
                 }
             }
@@ -51,7 +51,7 @@ fun BackgroundAnalysisDialog(onDismiss: () -> Unit, onStart: (List<Triple<Uri, S
                 allFiles = files
                 analyzedMap = statusMap
                 selectedFileUris = files.filter { file ->
-                    !BeatProfile.values().all { profile -> statusMap[file.uri to profile] == true }
+                    !BeatProfile.entries.all { profile -> statusMap[file.uri to profile] == true }
                 }.map { it.uri }.toSet()
                 isScanning = false
             }
@@ -77,7 +77,7 @@ fun BackgroundAnalysisDialog(onDismiss: () -> Unit, onStart: (List<Triple<Uri, S
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        BeatProfile.values().forEach { profile ->
+                        BeatProfile.entries.forEach { profile ->
                             FilterChip(
                                 selected = profile in selectedProfiles,
                                 onClick = { selectedProfiles = if (profile in selectedProfiles) selectedProfiles - profile else selectedProfiles + profile },

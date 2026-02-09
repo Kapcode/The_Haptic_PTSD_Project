@@ -37,7 +37,7 @@ fun BeatProfile.getIcon(): ImageVector = when(this) {
 fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
     val context = LocalContext.current
     val playerState by vm.playerState.collectAsState()
-    val folderUris by vm.folderUris
+    val folderUris = vm.folderUris
     val selectedProfile by vm.selectedProfile
     val expandedFolderUri by vm.expandedFolderUri
     val filesInExpandedFolder by vm.filesInExpandedFolder
@@ -70,7 +70,7 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
         title = "Bilateral Beat Player"
     ) {
         Column {
-            folderUris.forEach { uriString ->
+            for (uriString in folderUris) {
                 val folderUri = Uri.parse(uriString)
                 val isExpanded = expandedFolderUri == folderUri
                 FolderItem(folderUri, isExpanded) { vm.onFolderExpanded(folderUri) }
@@ -112,7 +112,7 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                         Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                     }
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        BeatProfile.values().forEach { profile ->
+                        BeatProfile.entries.forEach { profile ->
                             DropdownMenuItem(
                                 text = { 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -140,17 +140,25 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
 
 
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Max Haptic Intensity: ${(playerState.masterIntensity * 100).toInt()}%")
+            Text("Max Haptic Intensity: ${(SettingsManager.beatMaxIntensity * 100).toInt()}%")
             Slider(
-                value = playerState.masterIntensity,
-                onValueChange = { BeatDetector.updateMasterIntensity(applySnap(it, SettingsManager.snapBeatMaxIntensity)) }
+                value = SettingsManager.beatMaxIntensity,
+                onValueChange = { 
+                    SettingsManager.beatMaxIntensity = applySnap(it, SettingsManager.snapBeatMaxIntensity)
+                    SettingsManager.save()
+                    BeatDetector.updateMasterIntensity(SettingsManager.beatMaxIntensity)
+                }
             )
 
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Media Volume: ${(playerState.mediaVolume * 100).toInt()}%")
+            Text("Media Volume: ${(SettingsManager.mediaVolume * 100).toInt()}%")
             Slider(
-                value = playerState.mediaVolume,
-                onValueChange = { BeatDetector.updateMediaVolume(applySnap(it, SettingsManager.snapVolume)) }
+                value = SettingsManager.mediaVolume,
+                onValueChange = { 
+                    SettingsManager.mediaVolume = applySnap(it, SettingsManager.snapVolume)
+                    SettingsManager.save()
+                    BeatDetector.updateMediaVolume(SettingsManager.mediaVolume)
+                }
             )
 
             Spacer(modifier = Modifier.height(16.dp))

@@ -353,7 +353,7 @@ object BeatDetector {
             isPlaying = true,
             isPaused = false,
             totalDurationMs = mediaPlayer?.duration?.toLong() ?: 0L,
-            nextBeatIndex = 0
+            nextBeatIndex = findNextBeatIndex(_playerState.value.detectedBeats, 0)
         ) }
 
         startPlaybackJob()
@@ -365,7 +365,7 @@ object BeatDetector {
                 captureSize = Visualizer.getCaptureSizeRange()[1]
                 setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
                     override fun onWaveFormDataCapture(visualizer: Visualizer?, waveform: ByteArray?, samplingRate: Int) {
-                        if (SettingsManager.visualizerType == VisualizerType.WAVEFORM) {
+                        if (SettingsManager.isWaveformEnabled) {
                             waveform?.let {
                                 val floatData = FloatArray(it.size)
                                 for (i in it.indices) {
@@ -377,7 +377,7 @@ object BeatDetector {
                     }
 
                     override fun onFftDataCapture(visualizer: Visualizer?, fft: ByteArray?, samplingRate: Int) {
-                        if (SettingsManager.visualizerType == VisualizerType.VERTICAL_BARS) {
+                        if (SettingsManager.isBarsEnabled || SettingsManager.isChannelIntensityEnabled) {
                             fft?.let {
                                 val n = it.size / 2
                                 val magnitudes = FloatArray(n)
@@ -393,14 +393,14 @@ object BeatDetector {
                                 // Band 0: Overall Amplitude (Full spectrum average)
                                 var totalSum = 0f
                                 magnitudes.forEach { totalSum += it }
-                                bands[0] = (totalSum / n) * 3f
+                                bands[0] = (totalSum / n) * SettingsManager.gainAmplitude
                                 
                                 // Bands 1-2: Bass Range (Bins 1-5)
                                 for (i in 1..2) {
                                     val startBin = 1 + (i - 1) * 2
                                     var sum = 0f
                                     for (j in 0 until 2) sum += magnitudes[startBin + j]
-                                    bands[i] = (sum / 2) * 2.5f
+                                    bands[i] = (sum / 2) * SettingsManager.gainBass
                                 }
                                 
                                 // Bands 3-5: Drum Range (Bins 6-15)
@@ -408,7 +408,7 @@ object BeatDetector {
                                     val startBin = 6 + (i - 3) * 3
                                     var sum = 0f
                                     for (j in 0 until 3) sum += magnitudes[startBin + j]
-                                    bands[i] = (sum / 3) * 2.2f
+                                    bands[i] = (sum / 3) * SettingsManager.gainDrum
                                 }
                                 
                                 // Bands 6-12: Guitar Range (Bins 16-40)
@@ -416,7 +416,7 @@ object BeatDetector {
                                     val startBin = 16 + (i - 6) * 4
                                     var sum = 0f
                                     for (j in 0 until 4) sum += magnitudes[startBin + j]
-                                    bands[i] = (sum / 4) * 1.8f
+                                    bands[i] = (sum / 4) * SettingsManager.gainGuitar
                                 }
                                 
                                 // Bands 13-31: Highs (Bins 41-511)
@@ -428,19 +428,10 @@ object BeatDetector {
                                     for (j in 0 until bandSizeHigh) {
                                         if (startBin + j < n) sum += magnitudes[startBin + j]
                                     }
-                                    bands[i] = (sum / bandSizeHigh) * 1.5f
+                                    bands[i] = (sum / bandSizeHigh) * SettingsManager.gainHighs
                                 }
 
                                 HapticManager.updateVisualizer(bands)
-                            }
-                        } else if (SettingsManager.visualizerType == VisualizerType.CHANNEL_INTENSITY) {
-                            fft?.let {
-                                var sum = 0f
-                                for (i in it.indices) {
-                                    sum += abs(it[i].toFloat())
-                                }
-                                val intensity = (sum / it.size / 128f) * 3f
-                                HapticManager.updateVisualizer(floatArrayOf(intensity, intensity))
                             }
                         }
                     }
@@ -465,7 +456,8 @@ object BeatDetector {
                         val nextIndex = state.nextBeatIndex
                         if (nextIndex < state.detectedBeats.size) {
                             val beat = state.detectedBeats[nextIndex]
-                            if (currentPos >= beat.timestampMs) {
+                            val adjustedPos = currentPos + SettingsManager.hapticSyncOffsetMs
+                            if (adjustedPos >= beat.timestampMs) {
                                 beatToTrigger = beat
                                 state.copy(currentTimestampMs = currentPos, nextBeatIndex = nextIndex + 1)
                             } else {
