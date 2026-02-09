@@ -29,7 +29,8 @@ data class HapticState(
     val controllerRightBottomIntensity: Float = 0f,
 
     // Live visualizer data
-    val visualizerData: FloatArray = FloatArray(32) { 0f } // Increased to 32 bands
+    val visualizerData: FloatArray = FloatArray(32) { 0f },
+    val resetCounter: Int = 0
 )
 
 object HapticManager {
@@ -241,6 +242,19 @@ object HapticManager {
 
     fun updateVisualizer(data: FloatArray) {
         _state.value = _state.value.copy(visualizerData = data)
+    }
+
+    fun resetIconAlphas() {
+        _state.value = _state.value.copy(
+            phoneLeftIntensity = 0f,
+            phoneRightIntensity = 0f,
+            controllerLeftTopIntensity = 0f,
+            controllerLeftBottomIntensity = 0f,
+            controllerRightTopIntensity = 0f,
+            controllerRightBottomIntensity = 0f,
+            visualizerData = FloatArray(32) { 0f },
+            resetCounter = _state.value.resetCounter + 1
+        )
     }
 
     private fun sendIntentToService(action: String, extras: Intent.() -> Unit = {}) {

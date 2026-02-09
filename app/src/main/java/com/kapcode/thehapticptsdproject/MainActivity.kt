@@ -122,14 +122,15 @@ class MainActivity : ComponentActivity() {
         _isModeActiveHack = isModeActive
         val intent = Intent(this, HapticService::class.java)
         if (isModeActive) {
+            val squeezeEnabled = SettingsManager.isSqueezeEnabled && SettingsManager.isExperimentalEnabled
             runWithNotificationPermission {
                 intent.action = HapticService.ACTION_START
-                intent.putExtra(HapticService.EXTRA_SQUEEZE_ENABLED, SettingsManager.isSqueezeEnabled)
+                intent.putExtra(HapticService.EXTRA_SQUEEZE_ENABLED, squeezeEnabled)
                 intent.putExtra(HapticService.EXTRA_SHAKE_ENABLED, SettingsManager.isShakeEnabled)
                 intent.putExtra(HapticService.EXTRA_SHAKE_THRESHOLD, SettingsManager.internalShakeThreshold)
                 ContextCompat.startForegroundService(this, intent)
             }
-            if (SettingsManager.isSqueezeEnabled) squeezeDetector.start() else squeezeDetector.stop()
+            if (squeezeEnabled) squeezeDetector.start() else squeezeDetector.stop()
         } else {
             val playerState = BeatDetector.playerState.value
             if (!playerState.isPlaying && !playerState.isPaused) {
@@ -328,6 +329,13 @@ fun SettingsScreen() {
                     color = Color.Gray
                 )
                 Spacer(Modifier.height(4.dp))
+                
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { SettingsManager.showOffsetSlider = !SettingsManager.showOffsetSlider; SettingsManager.save() }) {
+                    Checkbox(checked = SettingsManager.showOffsetSlider, onCheckedChange = { SettingsManager.showOffsetSlider = it; SettingsManager.save() })
+                    Text("Show offset slider in player")
+                }
+
+                Spacer(Modifier.height(4.dp))
                 Text("Offset: ${SettingsManager.hapticSyncOffsetMs}ms", style = MaterialTheme.typography.bodyMedium)
                 Slider(
                     value = SettingsManager.hapticSyncOffsetMs.toFloat(),
@@ -338,6 +346,23 @@ fun SettingsScreen() {
                     valueRange = -200f..200f
                 )
             }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        SectionCard(
+            title = "Experimental Features",
+            actions = {
+                Switch(
+                    checked = SettingsManager.isExperimentalEnabled,
+                    onCheckedChange = {
+                        SettingsManager.isExperimentalEnabled = it
+                        SettingsManager.save()
+                    }
+                )
+            }
+        ) {
+            Text("Unlock features currently in development, such as Squeeze Detection via pressure sensors. These may be unstable.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
         }
 
         Spacer(Modifier.height(16.dp))
@@ -466,7 +491,7 @@ fun MainScreen(
     val detectorViewModel: DetectorViewModel = viewModel(factory = detectorViewModelFactory)
     val modesViewModel: ModesViewModel = viewModel()
 
-    LaunchedEffect(modesViewModel.modeState.value.activeModes, SettingsManager.isSqueezeEnabled, SettingsManager.isShakeEnabled) {
+    LaunchedEffect(modesViewModel.modeState.value.activeModes, SettingsManager.isSqueezeEnabled, SettingsManager.isShakeEnabled, SettingsManager.isExperimentalEnabled) {
         val isActiveHeartbeatActive =
             PTSDMode.ActiveHeartbeat in modesViewModel.modeState.value.activeModes
         val isBBPlayerActive = PTSDMode.BBPlayer in modesViewModel.modeState.value.activeModes
@@ -496,8 +521,12 @@ fun MainScreen(
         Spacer(modifier = Modifier.height(16.dp))
         BeatPlayerCard()
         Spacer(modifier = Modifier.height(16.dp))
-        SqueezeDetectorCard(SettingsManager.isSqueezeEnabled, { SettingsManager.isSqueezeEnabled = it; SettingsManager.save() }, viewModel = detectorViewModel)
-        Spacer(modifier = Modifier.height(16.dp))
+        
+        if (SettingsManager.isExperimentalEnabled) {
+            SqueezeDetectorCard(SettingsManager.isSqueezeEnabled, { SettingsManager.isSqueezeEnabled = it; SettingsManager.save() }, viewModel = detectorViewModel)
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
         ShakeDetectorCard(SettingsManager.isShakeEnabled, { SettingsManager.isShakeEnabled = it; SettingsManager.save() }, 55f - SettingsManager.internalShakeThreshold, { 
             SettingsManager.internalShakeThreshold = 55f - it
             SettingsManager.save()

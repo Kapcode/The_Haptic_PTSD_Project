@@ -30,18 +30,20 @@ object SettingsManager {
     var sessionDurationSeconds by mutableStateOf(120)
     var hapticLeadInMs by mutableStateOf(10)
     var hapticLeadOutMs by mutableStateOf(10)
-    var hapticSyncOffsetMs by mutableStateOf(30)
+    var hapticSyncOffsetMs by mutableStateOf(60)
 
     // Beat Player Settings
     var beatMaxIntensity by mutableStateOf(1.0f)
     var mediaVolume by mutableStateOf(1.0f)
     var lastPlayedAudioUri by mutableStateOf<String?>(null)
     var lastPlayedAudioName by mutableStateOf<String?>(null)
+    var showOffsetSlider by mutableStateOf(false)
 
-    // Visualizer Settings (Now individual layers)
+
+    // Visualizer Settings (Independent Layers)
     var isBarsEnabled by mutableStateOf(true)
     var isChannelIntensityEnabled by mutableStateOf(false)
-    var isWaveformEnabled by mutableStateOf(true)
+    var isWaveformEnabled by mutableStateOf(false)
 
     var gainAmplitude by mutableStateOf(12f)
     var gainBass by mutableStateOf(2.5f)
@@ -49,7 +51,8 @@ object SettingsManager {
     var gainGuitar by mutableStateOf(1.8f)
     var gainHighs by mutableStateOf(1.5f)
     var visualizerTriggeredAlpha by mutableStateOf(0.1f)
-    var minIconAlpha by mutableStateOf(0.5f)
+    var minIconAlpha by mutableStateOf(0.2f)
+    var latchDurationMs by mutableStateOf(200)
 
     // Experimental Switch
     var isExperimentalEnabled by mutableStateOf(false)
@@ -66,6 +69,7 @@ object SettingsManager {
     var snapTriggeredAlpha by mutableStateOf(0f)
     var snapIconAlpha by mutableStateOf(0f)
     var snapSyncOffset by mutableStateOf(0f)
+    var snapLatchDuration by mutableStateOf(0f)
 
     // Logging
     var logToLogcat by mutableStateOf(false)
@@ -85,15 +89,16 @@ object SettingsManager {
         sessionDurationSeconds = prefs.getInt("haptic_session_duration", 120)
         hapticLeadInMs = prefs.getInt("haptic_lead_in", 10)
         hapticLeadOutMs = prefs.getInt("haptic_lead_out", 10)
-        hapticSyncOffsetMs = prefs.getInt("haptic_sync_offset", 30)
+        hapticSyncOffsetMs = prefs.getInt("haptic_sync_offset", 60)
         beatMaxIntensity = prefs.getFloat("beat_max_intensity", 1.0f)
         mediaVolume = prefs.getFloat("media_volume", 1.0f)
         lastPlayedAudioUri = prefs.getString("last_played_audio_uri", null)
         lastPlayedAudioName = prefs.getString("last_played_audio_name", null)
-        
+        showOffsetSlider = prefs.getBoolean("show_offset_slider", false)
+
         isBarsEnabled = prefs.getBoolean("is_bars_enabled", true)
         isChannelIntensityEnabled = prefs.getBoolean("is_channel_intensity_enabled", false)
-        isWaveformEnabled = prefs.getBoolean("is_waveform_enabled", true)
+        isWaveformEnabled = prefs.getBoolean("is_waveform_enabled", false)
 
         gainAmplitude = prefs.getFloat("gain_amplitude", 12f)
         gainBass = prefs.getFloat("gain_bass", 2.5f)
@@ -101,7 +106,8 @@ object SettingsManager {
         gainGuitar = prefs.getFloat("gain_guitar", 1.8f)
         gainHighs = prefs.getFloat("gain_highs", 1.5f)
         visualizerTriggeredAlpha = prefs.getFloat("visualizer_triggered_alpha", 0.1f)
-        minIconAlpha = prefs.getFloat("min_icon_alpha", 0.5f)
+        minIconAlpha = prefs.getFloat("min_icon_alpha", 0.2f)
+        latchDurationMs = prefs.getInt("latch_duration", 200)
         
         isExperimentalEnabled = prefs.getBoolean("experimental_enabled", false)
 
@@ -116,6 +122,7 @@ object SettingsManager {
         snapTriggeredAlpha = prefs.getFloat("snap_triggered_alpha", 0f)
         snapIconAlpha = prefs.getFloat("snap_icon_alpha", 0f)
         snapSyncOffset = prefs.getFloat("snap_sync_offset", 0f)
+        snapLatchDuration = prefs.getFloat("snap_latch_duration", 0f)
         
         logToLogcat = prefs.getBoolean("log_to_logcat", false)
         authorizedFolderUris = prefs.getStringSet("authorized_folder_uris", emptySet()) ?: emptySet()
@@ -137,7 +144,8 @@ object SettingsManager {
             putFloat("media_volume", mediaVolume)
             putString("last_played_audio_uri", lastPlayedAudioUri)
             putString("last_played_audio_name", lastPlayedAudioName)
-            
+            putBoolean("show_offset_slider", showOffsetSlider)
+
             putBoolean("is_bars_enabled", isBarsEnabled)
             putBoolean("is_channel_intensity_enabled", isChannelIntensityEnabled)
             putBoolean("is_waveform_enabled", isWaveformEnabled)
@@ -149,6 +157,7 @@ object SettingsManager {
             putFloat("gain_highs", gainHighs)
             putFloat("visualizer_triggered_alpha", visualizerTriggeredAlpha)
             putFloat("min_icon_alpha", minIconAlpha)
+            putInt("latch_duration", latchDurationMs)
             
             putBoolean("experimental_enabled", isExperimentalEnabled)
 
@@ -163,6 +172,7 @@ object SettingsManager {
             putFloat("snap_triggered_alpha", snapTriggeredAlpha)
             putFloat("snap_icon_alpha", snapIconAlpha)
             putFloat("snap_sync_offset", snapSyncOffset)
+            putFloat("snap_latch_duration", snapLatchDuration)
             putBoolean("log_to_logcat", logToLogcat)
             putStringSet("authorized_folder_uris", authorizedFolderUris)
             apply()
@@ -179,13 +189,14 @@ object SettingsManager {
         sessionDurationSeconds = 120
         hapticLeadInMs = 10
         hapticLeadOutMs = 10
-        hapticSyncOffsetMs = 30
+        hapticSyncOffsetMs = 60
         beatMaxIntensity = 1.0f
         mediaVolume = 1.0f
+        showOffsetSlider = false
         
         isBarsEnabled = true
         isChannelIntensityEnabled = false
-        isWaveformEnabled = true
+        isWaveformEnabled = false
 
         gainAmplitude = 12f
         gainBass = 2.5f
@@ -193,7 +204,8 @@ object SettingsManager {
         gainGuitar = 1.8f
         gainHighs = 1.5f
         visualizerTriggeredAlpha = 0.1f
-        minIconAlpha = 0.5f
+        minIconAlpha = 0.2f
+        latchDurationMs = 200
         
         isExperimentalEnabled = false
         
@@ -208,6 +220,7 @@ object SettingsManager {
         snapTriggeredAlpha = 0f
         snapIconAlpha = 0f
         snapSyncOffset = 0f
+        snapLatchDuration = 0f
         
         save()
     }

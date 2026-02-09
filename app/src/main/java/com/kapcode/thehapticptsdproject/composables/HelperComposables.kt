@@ -1,5 +1,6 @@
 package com.kapcode.thehapticptsdproject.composables
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -16,6 +17,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.kapcode.thehapticptsdproject.BeatProfile
@@ -74,7 +76,7 @@ fun FileItem(name: String, isAnalyzed: Boolean, isSelected: Boolean, onClick: ()
 }
 
 @Composable
-fun InPlayerHapticVisualizer() {
+fun InPlayerHapticVisualizer(selectedProfile: BeatProfile? = null) {
     val hState by HapticManager.state.collectAsState()
     
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -137,7 +139,41 @@ fun InPlayerHapticVisualizer() {
                 )
             }
 
-            // 3. Bars in the foreground
+            // 3. Threshold Lines
+            if (SettingsManager.isBarsEnabled) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    repeat(32) { index ->
+                        val threshold = when {
+                            index == 0 -> 0.4f
+                            index in 1..12 -> 0.5f
+                            else -> null
+                        }
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            if (threshold != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .fillMaxHeight(threshold)
+                                        .align(Alignment.BottomCenter)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(1.dp)
+                                            .background(Color.White.copy(alpha = 0.3f))
+                                            .align(Alignment.TopCenter)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. Bars in the foreground
             Row(modifier = Modifier.fillMaxSize()) {
                 if (SettingsManager.isBarsEnabled) {
                     Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
@@ -186,10 +222,10 @@ fun InPlayerHapticVisualizer() {
                             val isDrumTriggered = data.size > 5 && (data[3] > 0.5f || data[4] > 0.5f || data[5] > 0.5f)
                             val isGuitarTriggered = data.size > 12 && (6..12).any { data[it] > 0.5f }
 
-                            ProfileIndicatorIcon(BeatProfile.AMPLITUDE, isAmplitudeTriggered, 1, Modifier.weight(1f))
-                            ProfileIndicatorIcon(BeatProfile.BASS, isBassTriggered, 2, Modifier.weight(2f))
-                            ProfileIndicatorIcon(BeatProfile.DRUM, isDrumTriggered, 3, Modifier.weight(3f))
-                            ProfileIndicatorIcon(BeatProfile.GUITAR, isGuitarTriggered, 7, Modifier.weight(7f))
+                            ProfileIndicatorIcon(BeatProfile.AMPLITUDE, isAmplitudeTriggered, selectedProfile == BeatProfile.AMPLITUDE, Modifier.weight(1f))
+                            ProfileIndicatorIcon(BeatProfile.BASS, isBassTriggered, selectedProfile == BeatProfile.BASS, Modifier.weight(2f))
+                            ProfileIndicatorIcon(BeatProfile.DRUM, isDrumTriggered, selectedProfile == BeatProfile.DRUM, Modifier.weight(3f))
+                            ProfileIndicatorIcon(BeatProfile.GUITAR, isGuitarTriggered, selectedProfile == BeatProfile.GUITAR, Modifier.weight(7f))
                             Spacer(modifier = Modifier.weight(19f))
                         }
                     }
@@ -213,30 +249,65 @@ fun InPlayerHapticVisualizer() {
 }
 
 @Composable
-fun ProfileIndicatorIcon(profile: BeatProfile, isTriggered: Boolean, weight: Int, modifier: Modifier = Modifier) {
+fun ProfileIndicatorIcon(profile: BeatProfile, isVisualizerTriggered: Boolean, isSelected: Boolean, modifier: Modifier = Modifier) {
+    val hState by HapticManager.state.collectAsState()
+    
+    // Dim if visualizer hits threshold OR if this is the active profile and haptics are firing
+    val isHapticActive = hState.phoneLeftIntensity > 0.01f || hState.phoneRightIntensity > 0.01f
+    val isCurrentlyTriggered = isVisualizerTriggered || (isSelected && isHapticActive)
+
     var latchTriggered by remember { mutableStateOf(false) }
     
-    LaunchedEffect(isTriggered) {
-        if (isTriggered) {
+    LaunchedEffect(hState.resetCounter) {
+        latchTriggered = false
+    }
+
+    LaunchedEffect(isCurrentlyTriggered) {
+        if (isCurrentlyTriggered) {
             latchTriggered = true
-            delay(200)
+            delay(SettingsManager.latchDurationMs.toLong())
             latchTriggered = false
         }
     }
 
-    val targetAlpha = if (latchTriggered) SettingsManager.visualizerTriggeredAlpha.coerceAtLeast(SettingsManager.minIconAlpha) else 1.0f
-
+    // displayTriggered stays true if either the live check or the latch is active.
+    // This fixes the Amplitude icon staying at 100% alpha when continuously above threshold.
+    val displayTriggered = isCurrentlyTriggered || latchTriggered
+    val targetAlpha = if (displayTriggered) SettingsManager.visualizerTriggeredAlpha.coerceAtLeast(SettingsManager.minIconAlpha) else 1.0f
+    
     val animatedAlpha by animateFloatAsState(
         targetValue = targetAlpha,
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
         label = "iconAlpha"
     )
+
+    // Wobbly effect for selected profile when haptics are active
+    val infiniteTransition = rememberInfiniteTransition(label = "wobble")
+    val wobbleAngle by infiniteTransition.animateFloat(
+        initialValue = -15f,
+        targetValue = 15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(100, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "wobbleAngle"
+    )
+
     Box(modifier = modifier.fillMaxHeight(), contentAlignment = Alignment.Center) {
         Icon(
             imageVector = profile.getIcon(),
             contentDescription = null,
             tint = profile.getColor(),
-            modifier = Modifier.size(15.dp).alpha(animatedAlpha)
+            modifier = Modifier
+                .size(15.dp)
+                .graphicsLayer {
+                    if (isSelected && isHapticActive) {
+                        rotationZ = wobbleAngle
+                        scaleX = 1.3f
+                        scaleY = 1.3f
+                    }
+                }
+                .alpha(animatedAlpha)
         )
     }
 }

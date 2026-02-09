@@ -180,7 +180,7 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                     Text("Current File: ${(playerState.analysisProgress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
                     LinearProgressIndicator(progress = { playerState.analysisProgress }, modifier = Modifier.fillMaxWidth())
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { BeatDetector.cancelAnalysis() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                    Button(onClick = { BeatDetector.cancelAnalysis() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error) ) {
                         Text("Cancel Analysis")
                     }
                 }
@@ -204,6 +204,19 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                         valueRange = 0f..playerState.totalDurationMs.toFloat().coerceAtLeast(1f),
                         modifier = Modifier.fillMaxWidth()
                     )
+                    
+                    if (SettingsManager.showOffsetSlider) {
+                        Text("Sync Offset: ${SettingsManager.hapticSyncOffsetMs}ms", style = MaterialTheme.typography.bodySmall)
+                        Slider(
+                            value = SettingsManager.hapticSyncOffsetMs.toFloat(),
+                            onValueChange = { 
+                                SettingsManager.hapticSyncOffsetMs = applySnap(it, SettingsManager.snapSyncOffset).toInt()
+                                SettingsManager.save()
+                            },
+                            valueRange = -200f..200f,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -236,7 +249,7 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                         }
                     }
 
-                    InPlayerHapticVisualizer()
+                    InPlayerHapticVisualizer(selectedProfile = selectedProfile)
                 }
             }
         }

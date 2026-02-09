@@ -478,7 +478,11 @@ object BeatDetector {
     fun pausePlayback() {
         mediaPlayer?.pause()
         visualizer?.enabled = false
-        _playerState.update { it.copy(isPlaying = false, isPaused = true) }
+        HapticManager.resetIconAlphas()
+        _playerState.update { it.copy(
+            isPlaying = false, 
+            isPaused = true
+        ) }
     }
 
     fun resumePlayback() {
@@ -534,6 +538,7 @@ object BeatDetector {
         mediaPlayer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null
+        HapticManager.resetIconAlphas()
         _playerState.update { it.copy(
             isPlaying = false, 
             isPaused = false,

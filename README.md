@@ -16,27 +16,31 @@ The application aims to provide physiological regulation through:
 A primary therapeutic feature where the user activates a comforting, rhythmic "heartbeat" vibration by squeezing their phone or using a sharp wrist movement. This mimics the calming effect of human touch or pulse-syncing, helping to break cycles of panic or distress even when lying in bed.
 
 ### Bilateral Beat Player
-Analyze any audio file from your library to generate a custom haptic profile. The app uses advanced signal processing to "feel" the music, providing synchronized tactile feedback that matches the intensity and duration of detected transients. Supports automatic caching for instant re-play.
+Analyze any audio file from your library to generate a custom haptic profile. The app uses advanced signal processing to "feel" the music, providing synchronized tactile feedback that matches the intensity and duration of detected transients.
+- **Automatic Analysis**: Missing a profile for a track? The app automatically queues it for background analysis as soon as it's selected.
+- **Sync Offset Adjustment**: Precision-tune the timing between audio and haptics to account for different hardware latencies.
 
-### Advanced Audio Visualizer
-A high-resolution, 32-band frequency visualizer available in-app and via persistent notification. It features color-coded ranges that correspond to detection profiles:
-- **Cyan**: Overall Amplitude
-- **Tan**: Bass Range
-- **Orange**: Drum Range
-- **Grass Green**: Guitar Range
-The visualizer includes profile-specific icons beneath each frequency range. When audio intensity in a specific range exceeds the detection threshold, the corresponding bars smoothly transition their transparency (alpha) to provide subtle, real-time feedback.
+### Multi-Layer Audio Visualizer
+A high-resolution, 32-band frequency visualizer available in-app and via persistent notification. It supports independent, overlapping layers that can be toggled in settings:
+- **Vertical Bars (Live HZ)**: Detailed frequency-specific feedback with subtle threshold lines.
+- **Channel Intensity (L/R)**: Real-time volume levels for left and right channels.
+- **Waveform**: A fluid background representation of the overall audio energy.
+- **Color Coding**: Cyan (Amplitude), Tan (Bass), Orange (Drum), and Grass Green (Guitar) help identify exactly which sounds are driving your grounding feedback.
 
 ### Smooth, Calming Animations
-All visual feedback—including frequency bars, haptic icons, and progress indicators—uses non-bouncy, low-stiffness spring animations. This ensures that visual transitions are fluid and glide between states, avoiding abrupt flashing or jarring movements to maintain a stress-relieving environment.
+All visual feedback—including frequency bars, haptic icons, and progress indicators—uses non-bouncy, low-stiffness spring animations. Active profiles now feature a "wobble" effect when triggered, providing a clear visual link between the sound and the haptic pulse.
 
-### Intelligent Auto-Selection
-The app automatically prepares your therapeutic environment by choosing the best available audio track. It prioritizes previously analyzed files (choosing the shortest ones for quick sessions) and remembers your last played track, ensuring support is always one tap away.
+### Intelligent Auto-Selection & Management
+The app automatically prepares your therapeutic environment by choosing the best available audio track on startup. It prioritizes previously analyzed files and remembers your last played track. 
 
 ### Notification Media Controls
-Full media playback controls are integrated directly into the persistent notification. This allows you to play, pause, stop, and skip forward or backward by 5 or 30 seconds without needing to open the app. The controls are synchronized with the in-app player.
+Full media playback controls are integrated directly into the persistent notification. This allows you to play, pause, stop, and skip forward or backward by 5 or 30 seconds without needing to open the app.
 
-### Persistent Customization & Calibration
-The app includes precision calibration tools for both acoustic pressure detection and motion sensitivity. All preferences—intensity, BPM, lead-in/out timing, and detection thresholds—are automatically saved.
+### Persistent Customization & Precision Controls
+- **Slider Snapping**: All sensitive controls (Intensity, Volume, Sensitivity) feature configurable snapping increments for predictable and consistent adjustments.
+- **Visualizer Gain**: Independent gain controls for each frequency range allow you to tailor the visual feedback to your specific hearing or hardware needs.
+- **Reset to Defaults**: Quickly revert all settings to factory configurations with a single tap.
+- **Experimental Features Toggle**: Hide complex or beta tools like Squeeze Detection to maintain a focused, distraction-free interface for daily use.
 
 ### Privacy First
 Built for the most sensitive contexts, all detection and analysis happen locally on the device. No audio or sensor data is recorded permanently or sent to external servers, ensuring total user confidentiality.
@@ -44,12 +48,12 @@ Built for the most sensitive contexts, all detection and analysis happen locally
 ---
 
 ## Tech Stack
-- **UI:** Jetpack Compose (Material 3)
-- **Logic:** Kotlin / Coroutines / ViewModels
-- **Sensing:** Acoustic Pressure Detection (sonar-based) & Linear Acceleration (gravity-independent motion)
-- **Background:** Android Foreground Service with WakeLock
-- **Signal Processing:** JTransforms (FFT) / Adaptive Transient Detection
-- **Persistence**: JSON-based haptic profiles
+- **UI:** Jetpack Compose (Material 3) with real-time reactive state.
+- **Logic:** Kotlin / Coroutines / Channel-based Task Queueing.
+- **Sensing:** Acoustic Pressure Detection (sonar-based) & Linear Acceleration (gravity-independent motion).
+- **Background:** Android Foreground Service with WakeLock and persistent status notifications.
+- **Signal Processing:** JTransforms (FFT) / Adaptive Transient Detection.
+- **Persistence**: JSON-based haptic profiles and encrypted preferences.
 
 ## Requirements
 - Android 11 (API 30) or higher.

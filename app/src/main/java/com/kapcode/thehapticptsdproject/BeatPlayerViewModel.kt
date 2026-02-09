@@ -167,18 +167,22 @@ class BeatPlayerViewModel : ViewModel() {
     fun play(context: Context) {
         if (playerState.value.detectedBeats.isEmpty()) {
             Toast.makeText(context, "Waiting for audio analysis to complete...", Toast.LENGTH_SHORT).show()
-            // Analysis is likely already queued by loadProfileForSelectedTrack
             return
         }
 
-        // Ensure the service is running so the notification is visible
+        // Ensure the service is running
         val intent = Intent(context, HapticService::class.java).apply {
             action = HapticService.ACTION_START
         }
         (context as? MainActivity)?.runWithNotificationPermission {
             ContextCompat.startForegroundService(context, intent)
         }
-        BeatDetector.playSynchronized(context)
+
+        if (playerState.value.isPaused) {
+            BeatDetector.resumePlayback()
+        } else {
+            BeatDetector.playSynchronized(context)
+        }
     }
 
     fun pause() {

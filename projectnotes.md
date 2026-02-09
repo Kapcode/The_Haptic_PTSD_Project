@@ -10,7 +10,9 @@ This document contains technical details, architectural decisions, and developme
 - **Language:** Kotlin / Coroutines.
 - **Architecture:** MVVM with ViewModels (`BeatPlayerViewModel`, `ModesViewModel`, etc.)
 - **Background Logic:** Android Foreground Service (`HapticService.kt`) with `PARTIAL_WAKE_LOCK`.
-- **Persistence:** `SharedPreferences` managed via `SettingsManager.kt`.
+- **Persistence:** `SharedPreferences` managed via `SettingsManager.kt`. 
+    - **State Management**: Refactored to use Compose `mutableStateOf` with delegates for real-time reactivity across the UI.
+    - **Methods**: Includes centralized `save()` and `resetToDefaults()` methods for predictable configuration management.
 
 ## Core Hardware Integration
 
@@ -20,6 +22,7 @@ This document contains technical details, architectural decisions, and developme
 - **Concurrency**: `AtomicBoolean` for running state and `AtomicBoolean` for signaling recalibration to avoid race conditions.
 - **Calibration**: Dynamic baseline calculation + user-adjustable sensitivity threshold (5% - 95% with 5% steps).
 - **Safe Shutdown**: Hardware `stop()` calls precede coroutine `cancelAndJoin()` to prevent `SIGABRT` native crashes.
+- **Visibility**: Hidden behind the "Experimental Features" switch in Settings to prevent accidental calibration changes during normal use.
 
 ### Motion Detection (`MainActivity.kt` & `HapticService.kt`)
 - **Sensor**: `Sensor.TYPE_LINEAR_ACCELERATION`.
@@ -29,7 +32,7 @@ This document contains technical details, architectural decisions, and developme
 ### Haptic Feedback Engine (`HapticManager.kt`)
 - **Pattern**: "Lub-dub" heartbeat simulation.
 - **Architecture**: Singleton `object` to ensure unified state between the UI and Background Service.
-- **Live Visualizer State**: Tracks real-time intensity for four virtual motors (Phones L/R, Controllers L/R).
+- **Live Visualizer State**: Tracks real-time intensity for virtual motors (Phones L/R, Controllers L/R).
 - **Decay Logic**: Background loop reduces motor intensity over time to create a smooth "glow" effect.
 - **Adjustable Timing**: Supports user-defined "lead-in" and "lead-out" periods for both physical vibration and visual feedback.
 - **Session Management**: Timer-based sessions with auto-stop and "reset-on-trigger" extension logic.
@@ -42,38 +45,39 @@ This document contains technical details, architectural decisions, and developme
 - **Pass 1**: Scans audio to identify potential beat candidates and determine a dynamic energy threshold.
 - **Pass 2**: Filters candidates based on the threshold to finalize rhythmic timestamps.
 - **Optimization**: Intelligent downsampling (analyzing 1 in 4 samples) significantly reduces CPU load during profile generation.
-- **Background Processing**: Batch analysis handled by `AnalysisService.kt` with persistent progress notifications.
+- **Background Processing**: `AnalysisService.kt` uses a `Channel`-based task processor to handle queued analysis tasks efficiently, moving away from sequential looping.
+
+### Visual Feedback & Visualizer Logic
+- **Layers**: Supports multiple overlapping visualizer layers (Vertical Bars, Channel Intensity, and Waveform) that can be toggled independently.
+- **Threshold Lines**: Horizontal lines in the vertical bars visualizer signify the exact haptic trigger points for each profile range (0.4 for Amplitude, 0.5 for others).
+- **Profile Icons**: Icons at the base of the visualizer dim when their corresponding frequency range is triggered.
+- **Active Feedback (Wobble)**: The icon for the currently selected profile performs a rapid rotation/scale animation ("wobble") whenever a haptic pulse is triggered, providing direct visual confirmation of active therapeutic stimulation.
+- **Haptic Sync**: Icon dimming is synchronized with both raw audio thresholds and live haptic events to ensure visual continuity even if audio analysis is slightly out of sync.
 
 ### Intelligent Auto-Selection & Persistence
 - **Auto-Selection**: The `BeatPlayerViewModel` automatically selects a track on startup. It prioritizes analyzed files (choosing the shortest for convenience) and remembers the last played track as a fallback.
+- **Missing Profiles**: Automatically queues analysis if a user selects a track/profile combination that hasn't been generated yet.
 - **Persistence**: Last played URI and Name are persisted in `SettingsManager`.
 
 ### File Tree Selection UI
 - **Implementation**: Lazy-loading folder/file browser using SAF (Storage Access Framework) URIs.
+- **Permissions**: Improved folder permission handling in `MediaFoldersViewModel`.
 - **Auto-loading**: Automatically scans for and loads existing haptic profiles (.json) when a track or profile type is selected.
 
 ### Notification Controls
 - **Implementation**: Media controls (play, pause, stop, skip) are implemented in the `HapticService` notification.
 - **Synchronization**: The notification controls are synchronized with the in-app player via `BeatDetector`.
 
+## UI/UX Design
+
+### Responsive Controls
+- **Slider Snapping**: Configurable snapping increments for intensity, volume, and sensitivity controls to ensure precise user adjustments.
+- **Smoothing**: All visual feedback uses non-bouncy, low-stiffness spring animations for a calming effect.
+
 ## Future Features & Ideas
 
-### Picture-in-Picture (PiP) Haptic Visualizer
-- **Goal**: Floating visual confirmation of haptic activity while using other apps.
-- **Multi-device Support**: Design for visualizing output across synchronized phones/controllers.
-
-## Software Architecture
-
-### Logging System (`Logger.kt`)
-- **Persistence**: Persistent "Log to Logcat" preference saved in `SettingsManager`.
-- **UI Features**: Filterable log history with Logcat mirroring for advanced debugging.
-
-### Mode Management (`UserFacingModes.kt`)
-- **Lifecycle**: Therapeutic modes (e.g., Active Heartbeat) are intentionally reset on app launch for safety.
-
-### Persistence (`SettingsManager.kt`)
-- **Scope**: Hardware preferences (Intensity, BPM, Timing, Thresholds) and last played media metadata are persisted.
-- **Exclusion**: Active modes are NOT persisted.
+### Multi-device Support
+- **Goal**: Synchronizing haptic output across multiple phones or controllers for unified bilateral stimulation.
 
 ## Current Known Issues / Notes
 - **Foreground Service**: Requires `FOREGROUND_SERVICE_SPECIAL_USE` for analysis and microphone permissions for squeeze detection.
