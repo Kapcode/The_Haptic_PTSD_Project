@@ -293,33 +293,41 @@ fun SettingsScreen() {
                 
                 Spacer(Modifier.height(16.dp))
                 Text("Visualizer Gain Control", style = MaterialTheme.typography.titleMedium)
-                GainSettingRow("Amplitude Gain", SettingsManager.gainAmplitude) { SettingsManager.gainAmplitude = it; SettingsManager.save() }
-                GainSettingRow("Bass Gain", SettingsManager.gainBass) { SettingsManager.gainBass = it; SettingsManager.save() }
-                GainSettingRow("Drum Gain", SettingsManager.gainDrum) { SettingsManager.gainDrum = it; SettingsManager.save() }
-                GainSettingRow("Guitar Gain", SettingsManager.gainGuitar) { SettingsManager.gainGuitar = it; SettingsManager.save() }
-                GainSettingRow("Highs Gain", SettingsManager.gainHighs) { SettingsManager.gainHighs = it; SettingsManager.save() }
+                GainSettingRow("Amplitude Gain", SettingsManager.gainAmplitude, 12f) { SettingsManager.gainAmplitude = it; SettingsManager.save() }
+                GainSettingRow("Bass Gain", SettingsManager.gainBass, 2.5f) { SettingsManager.gainBass = it; SettingsManager.save() }
+                GainSettingRow("Drum Gain", SettingsManager.gainDrum, 2.2f) { SettingsManager.gainDrum = it; SettingsManager.save() }
+                GainSettingRow("Guitar Gain", SettingsManager.gainGuitar, 1.8f) { SettingsManager.gainGuitar = it; SettingsManager.save() }
+                GainSettingRow("Highs Gain", SettingsManager.gainHighs, 1.5f) { SettingsManager.gainHighs = it; SettingsManager.save() }
                 
                 Spacer(Modifier.height(8.dp))
                 Text("Triggered Dimming (Alpha: ${(SettingsManager.visualizerTriggeredAlpha * 100).toInt()}% )", style = MaterialTheme.typography.bodyMedium)
-                Slider(
+                SliderWithTick(
                     value = SettingsManager.visualizerTriggeredAlpha,
                     onValueChange = { 
                         SettingsManager.visualizerTriggeredAlpha = applySnap(it, SettingsManager.snapTriggeredAlpha)
                         SettingsManager.save()
                     },
-                    valueRange = 0f..1f
+                    valueRange = 0f..1f,
+                    defaultValue = 0.1f
                 )
 
                 Spacer(Modifier.height(8.dp))
                 Text("Minimum Icon Alpha: ${(SettingsManager.minIconAlpha * 100).toInt()}%", style = MaterialTheme.typography.bodyMedium)
-                Slider(
+                SliderWithTick(
                     value = SettingsManager.minIconAlpha,
                     onValueChange = { 
                         SettingsManager.minIconAlpha = applySnap(it, SettingsManager.snapIconAlpha)
                         SettingsManager.save()
                     },
-                    valueRange = 0f..1f
+                    valueRange = 0f..1f,
+                    defaultValue = 0.2f
                 )
+
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { SettingsManager.invertVisualizerAlpha = !SettingsManager.invertVisualizerAlpha; SettingsManager.save() }) {
+                    Checkbox(checked = SettingsManager.invertVisualizerAlpha, onCheckedChange = { SettingsManager.invertVisualizerAlpha = it; SettingsManager.save() })
+                    Text("Invert Icon Alpha (Bright when triggered)")
+                }
 
                 Spacer(Modifier.height(16.dp))
                 Text("Haptic/Audio Sync (Offset)", style = MaterialTheme.typography.titleMedium)
@@ -337,14 +345,47 @@ fun SettingsScreen() {
 
                 Spacer(Modifier.height(4.dp))
                 Text("Offset: ${SettingsManager.hapticSyncOffsetMs}ms", style = MaterialTheme.typography.bodyMedium)
-                Slider(
+                SliderWithTick(
                     value = SettingsManager.hapticSyncOffsetMs.toFloat(),
                     onValueChange = { 
                         SettingsManager.hapticSyncOffsetMs = applySnap(it, SettingsManager.snapSyncOffset).toInt()
                         SettingsManager.save()
                     },
-                    valueRange = -200f..200f
+                    valueRange = -200f..200f,
+                    defaultValue = 60f
                 )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        SectionCard(title = "Visualizer Trigger Thresholds") {
+            Column {
+                Text(
+                    "Adjust the sensitivity for each LIVE visualizer icon. This does NOT affect audio analysis.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+                Spacer(Modifier.height(4.dp))
+                Row {
+                    Text("Bar Threshold: ", style = MaterialTheme.typography.bodySmall)
+                    Text("White", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                    Text(" / Icon Trigger: ", style = MaterialTheme.typography.bodySmall)
+                    Text("Red", color = Color.Red, style = MaterialTheme.typography.bodySmall)
+                }
+                Spacer(Modifier.height(12.dp))
+                ThresholdSettingRow("Amplitude Icon Animation Trigger", SettingsManager.triggerThresholdAmplitude, 0.38f) {
+                    SettingsManager.triggerThresholdAmplitude = it; SettingsManager.save()
+                }
+                ThresholdSettingRow("Bass Threshold", SettingsManager.triggerThresholdBass, 0.48f) {
+                    SettingsManager.triggerThresholdBass = it; SettingsManager.save()
+                }
+                ThresholdSettingRow("Drum Threshold", SettingsManager.triggerThresholdDrum, 0.48f) {
+                    SettingsManager.triggerThresholdDrum = it; SettingsManager.save()
+                }
+                ThresholdSettingRow("Guitar Threshold", SettingsManager.triggerThresholdGuitar, 0.48f) {
+                    SettingsManager.triggerThresholdGuitar = it; SettingsManager.save()
+                }
             }
         }
 
@@ -352,6 +393,7 @@ fun SettingsScreen() {
 
         SectionCard(
             title = "Experimental Features",
+            isExperimental = true,
             actions = {
                 Switch(
                     checked = SettingsManager.isExperimentalEnabled,
@@ -362,7 +404,7 @@ fun SettingsScreen() {
                 )
             }
         ) {
-            Text("Unlock features currently in development, such as Squeeze Detection via pressure sensors. These may be unstable.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            Text("Unlock features currently in development, such as Squeeze Detection via on-device sonar. These may be unstable.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
         }
 
         Spacer(Modifier.height(16.dp))
@@ -370,78 +412,83 @@ fun SettingsScreen() {
         SectionCard(title = "Slider Snapping") {
             Column {
                 Text(
-                    "Specify the snapping increment for each slider. For percentage-based sliders (Intensity, Volume), 2 means 2%. Use 0 for no snapping.",
+                    "Specify the snapping increment for each slider. Use 0 for no snapping.",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray
                 )
                 Spacer(Modifier.height(12.dp))
 
-                SnapSettingRow(
-                    "Intensity Snap (%)",
-                    SettingsManager.snapIntensity,
-                    isPercentage = true
-                ) { SettingsManager.snapIntensity = it; SettingsManager.save() }
+                Text("Whole Numbers", style = MaterialTheme.typography.titleMedium)
                 SnapSettingRow("BPM Snap (Units)", SettingsManager.snapBpm, isPercentage = false) {
                     SettingsManager.snapBpm = it; SettingsManager.save()
                 }
-                SnapSettingRow(
-                    "Duration Snap (Units)",
-                    SettingsManager.snapDuration,
-                    isPercentage = false
-                ) { SettingsManager.snapDuration = it; SettingsManager.save() }
-                SnapSettingRow(
-                    "Media Volume Snap (%)",
-                    SettingsManager.snapVolume,
-                    isPercentage = true
-                ) { SettingsManager.snapVolume = it; SettingsManager.save() }
-                SnapSettingRow(
-                    "BB Max Intensity Snap (%)",
-                    SettingsManager.snapBeatMaxIntensity,
-                    isPercentage = true
-                ) { SettingsManager.snapBeatMaxIntensity = it; SettingsManager.save() }
-                SnapSettingRow(
-                    "Squeeze Sensitivity Snap (%)",
-                    SettingsManager.snapSqueeze,
-                    isPercentage = true
-                ) { SettingsManager.snapSqueeze = it; SettingsManager.save() }
-                SnapSettingRow(
-                    "Shake Sensitivity Snap (Units)",
-                    SettingsManager.snapShake,
-                    isPercentage = false
-                ) { SettingsManager.snapShake = it; SettingsManager.save() }
-                SnapSettingRow(
-                    "Gain Snap (Units)",
-                    SettingsManager.snapGain,
-                    isPercentage = false
-                ) { SettingsManager.snapGain = it; SettingsManager.save() }
-                SnapSettingRow(
-                    "Triggered Alpha Snap (%)",
-                    SettingsManager.snapTriggeredAlpha,
-                    isPercentage = true
-                ) { SettingsManager.snapTriggeredAlpha = it; SettingsManager.save() }
-                SnapSettingRow(
-                    "Icon Alpha Snap (%)",
-                    SettingsManager.snapIconAlpha,
-                    isPercentage = true
-                ) { SettingsManager.snapIconAlpha = it; SettingsManager.save() }
-                SnapSettingRow(
-                    "Sync Offset Snap (ms)",
-                    SettingsManager.snapSyncOffset,
-                    isPercentage = false
-                ) { SettingsManager.snapSyncOffset = it; SettingsManager.save() }
+                SnapSettingRow("Duration Snap (Units)", SettingsManager.snapDuration, isPercentage = false) {
+                    SettingsManager.snapDuration = it; SettingsManager.save()
+                }
+                SnapSettingRow("Sync Offset Snap (ms)", SettingsManager.snapSyncOffset, isPercentage = false) {
+                    SettingsManager.snapSyncOffset = it; SettingsManager.save()
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Text("Decimals (Percentages)", style = MaterialTheme.typography.titleMedium)
+                SnapSettingRow("Intensity Snap (%)", SettingsManager.snapIntensity, isPercentage = true) {
+                    SettingsManager.snapIntensity = it; SettingsManager.save()
+                }
+                SnapSettingRow("Media Volume Snap (%)", SettingsManager.snapVolume, isPercentage = true) {
+                    SettingsManager.snapVolume = it; SettingsManager.save()
+                }
+                SnapSettingRow("BB Max Intensity Snap (%)", SettingsManager.snapBeatMaxIntensity, isPercentage = true) {
+                    SettingsManager.snapBeatMaxIntensity = it; SettingsManager.save()
+                }
+                SnapSettingRow("Squeeze Sensitivity Snap (%)", SettingsManager.snapSqueeze, isPercentage = true) {
+                    SettingsManager.snapSqueeze = it; SettingsManager.save()
+                }
+                SnapSettingRow("Triggered Alpha Snap (%)", SettingsManager.snapTriggeredAlpha, isPercentage = true) {
+                    SettingsManager.snapTriggeredAlpha = it; SettingsManager.save()
+                }
+                SnapSettingRow("Icon Alpha Snap (%)", SettingsManager.snapIconAlpha, isPercentage = true) {
+                    SettingsManager.snapIconAlpha = it; SettingsManager.save()
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Text("Decimals (Units)", style = MaterialTheme.typography.titleMedium)
+                SnapSettingRow("Shake Sensitivity Snap (Units)", SettingsManager.snapShake, isPercentage = false) {
+                    SettingsManager.snapShake = it; SettingsManager.save()
+                }
+                SnapSettingRow("Gain Snap (Units)", SettingsManager.snapGain, isPercentage = false) {
+                    SettingsManager.snapGain = it; SettingsManager.save()
+                }
+                SnapSettingRow("Trigger Threshold Snap (Units)", SettingsManager.snapTriggerThreshold, isPercentage = false) {
+                    SettingsManager.snapTriggerThreshold = it; SettingsManager.save()
+                }
             }
         }
     }
 }
 
 @Composable
-fun GainSettingRow(label: String, value: Float, onValueChange: (Float) -> Unit) {
+fun ThresholdSettingRow(label: String, value: Float, defaultValue: Float, onValueChange: (Float) -> Unit) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        Text("$label: ${String.format("%.2f", value)}", style = MaterialTheme.typography.bodySmall)
+        SliderWithTick(
+            value = value,
+            onValueChange = { onValueChange(applySnap(it, SettingsManager.snapTriggerThreshold)) },
+            valueRange = 0.1f..1.0f,
+            defaultValue = defaultValue,
+            modifier = Modifier.height(24.dp)
+        )
+    }
+}
+
+@Composable
+fun GainSettingRow(label: String, value: Float, defaultValue: Float, onValueChange: (Float) -> Unit) {
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Text("$label: ${String.format("%.1f", value)}", style = MaterialTheme.typography.bodySmall)
-        Slider(
+        SliderWithTick(
             value = value,
-            onValueChange = { onValueChange(it) },
+            onValueChange = { onValueChange(applySnap(it, SettingsManager.snapGain)) },
             valueRange = 0.1f..30f,
+            defaultValue = defaultValue,
             modifier = Modifier.height(24.dp)
         )
     }
@@ -523,11 +570,16 @@ fun MainScreen(
         Spacer(modifier = Modifier.height(16.dp))
         
         if (SettingsManager.isExperimentalEnabled) {
-            SqueezeDetectorCard(SettingsManager.isSqueezeEnabled, { SettingsManager.isSqueezeEnabled = it; SettingsManager.save() }, viewModel = detectorViewModel)
+            SqueezeDetectorCard(
+                isEnabled = SettingsManager.isSqueezeEnabled, 
+                onToggle = { SettingsManager.isSqueezeEnabled = it; SettingsManager.save() }, 
+                viewModel = detectorViewModel,
+                isExperimental = true
+            )
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        ShakeDetectorCard(SettingsManager.isShakeEnabled, { SettingsManager.isShakeEnabled = it; SettingsManager.save() }, 55f - SettingsManager.internalShakeThreshold, { 
+        ShakeDetectorCard(SettingsManager.isShakeEnabled, { SettingsManager.isShakeEnabled = it; SettingsManager.save() }, 55f - SettingsManager.internalShakeThreshold, {
             SettingsManager.internalShakeThreshold = 55f - it
             SettingsManager.save()
         })

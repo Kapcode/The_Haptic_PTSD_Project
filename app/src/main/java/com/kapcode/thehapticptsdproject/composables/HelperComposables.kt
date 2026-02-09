@@ -19,7 +19,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.kapcode.thehapticptsdproject.BeatProfile
 import com.kapcode.thehapticptsdproject.HapticManager
 import com.kapcode.thehapticptsdproject.R
@@ -30,7 +33,32 @@ import com.kapcode.thehapticptsdproject.getIcon
 import kotlinx.coroutines.delay
 
 @Composable
-fun SectionCard(title: String, actions: @Composable RowScope.() -> Unit = {}, content: @Composable () -> Unit) {
+fun ExperimentalTag(modifier: Modifier = Modifier) {
+    Surface(
+        color = Color(0xFFFFD700).copy(alpha = 0.15f), // Suttle Yellow
+        contentColor = Color(0xFFDAA520), // Darker Goldenrod for text
+        shape = RoundedCornerShape(4.dp),
+        modifier = modifier.padding(start = 8.dp)
+    ) {
+        Text(
+            text = "EXPERIMENTAL",
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Visible,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+        )
+    }
+}
+
+@Composable
+fun SectionCard(
+    title: String,
+    isExperimental: Boolean = false,
+    actions: @Composable RowScope.() -> Unit = {},
+    content: @Composable () -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -38,7 +66,19 @@ fun SectionCard(title: String, actions: @Composable RowScope.() -> Unit = {}, co
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (isExperimental) {
+                        ExperimentalTag()
+                    }
+                }
                 Row { actions() }
             }
             content()
@@ -111,7 +151,7 @@ fun InPlayerHapticVisualizer(selectedProfile: BeatProfile? = null) {
             if (SettingsManager.isWaveformEnabled) {
                 val animatedLineAlpha by animateFloatAsState(
                     targetValue = 0.3f + (overallIntensity * 0.4f),
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
                     label = "lineAlpha"
                 )
                 Box(
@@ -126,7 +166,7 @@ fun InPlayerHapticVisualizer(selectedProfile: BeatProfile? = null) {
                 // 2. Audio Wave (Pulsing area) in the middle
                 val animatedWaveAlpha by animateFloatAsState(
                     targetValue = 0.1f + (overallIntensity * 0.6f),
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
                     label = "waveAlpha"
                 )
                 Box(
@@ -146,13 +186,17 @@ fun InPlayerHapticVisualizer(selectedProfile: BeatProfile? = null) {
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     repeat(32) { index ->
-                        val threshold = when {
-                            index == 0 -> 0.4f
-                            index in 1..12 -> 0.5f
-                            else -> null
+                        val (threshold, triggerThreshold) = when {
+                            index == 0 -> 0.4f to SettingsManager.triggerThresholdAmplitude
+                            index in 1..2 -> 0.5f to SettingsManager.triggerThresholdBass
+                            index in 3..5 -> 0.5f to SettingsManager.triggerThresholdDrum
+                            index in 6..12 -> 0.5f to SettingsManager.triggerThresholdGuitar
+                            else -> null to null
                         }
+
                         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                             if (threshold != null) {
+                                // Main threshold line
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -166,6 +210,23 @@ fun InPlayerHapticVisualizer(selectedProfile: BeatProfile? = null) {
                                             .background(Color.White.copy(alpha = 0.3f))
                                             .align(Alignment.TopCenter)
                                     )
+                                }
+                                // Trigger threshold line (if different)
+                                if (triggerThreshold != null && triggerThreshold != threshold) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .fillMaxHeight(triggerThreshold)
+                                            .align(Alignment.BottomCenter)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(1.dp)
+                                                .background(Color.Red.copy(alpha = 0.4f))
+                                                .align(Alignment.TopCenter)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -204,8 +265,8 @@ fun InPlayerHapticVisualizer(selectedProfile: BeatProfile? = null) {
                                 val targetAlpha = if (isAboveThreshold && profile != null) SettingsManager.visualizerTriggeredAlpha else 1.0f
                                 
                                 VisualizerBar(
-                                    intensity = intensity, 
-                                    color = baseColor, 
+                                    intensity = intensity,
+                                    color = baseColor,
                                     alpha = targetAlpha,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -217,10 +278,10 @@ fun InPlayerHapticVisualizer(selectedProfile: BeatProfile? = null) {
                             horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             val data = hState.visualizerData
-                            val isAmplitudeTriggered = data.getOrNull(0)?.let { it > 0.4f } ?: false
-                            val isBassTriggered = data.size > 2 && (data[1] > 0.5f || data[2] > 0.5f)
-                            val isDrumTriggered = data.size > 5 && (data[3] > 0.5f || data[4] > 0.5f || data[5] > 0.5f)
-                            val isGuitarTriggered = data.size > 12 && (6..12).any { data[it] > 0.5f }
+                            val isAmplitudeTriggered = data.getOrNull(0)?.let { it > SettingsManager.triggerThresholdAmplitude } ?: false
+                            val isBassTriggered = data.size > 2 && (data[1] > SettingsManager.triggerThresholdBass || data[2] > SettingsManager.triggerThresholdBass)
+                            val isDrumTriggered = data.size > 5 && (data[3] > SettingsManager.triggerThresholdDrum || data[4] > SettingsManager.triggerThresholdDrum || data[5] > SettingsManager.triggerThresholdDrum)
+                            val isGuitarTriggered = data.size > 12 && (6..12).any { data[it] > SettingsManager.triggerThresholdGuitar }
 
                             ProfileIndicatorIcon(BeatProfile.AMPLITUDE, isAmplitudeTriggered, selectedProfile == BeatProfile.AMPLITUDE, Modifier.weight(1f))
                             ProfileIndicatorIcon(BeatProfile.BASS, isBassTriggered, selectedProfile == BeatProfile.BASS, Modifier.weight(2f))
@@ -252,9 +313,12 @@ fun InPlayerHapticVisualizer(selectedProfile: BeatProfile? = null) {
 fun ProfileIndicatorIcon(profile: BeatProfile, isVisualizerTriggered: Boolean, isSelected: Boolean, modifier: Modifier = Modifier) {
     val hState by HapticManager.state.collectAsState()
     
-    // Dim if visualizer hits threshold OR if this is the active profile and haptics are firing
     val isHapticActive = hState.phoneLeftIntensity > 0.01f || hState.phoneRightIntensity > 0.01f
-    val isCurrentlyTriggered = isVisualizerTriggered || (isSelected && isHapticActive)
+    
+    // Amplitude is a special case: it should trigger on ANY haptic pulse, not just when selected.
+    val isCurrentlyTriggered = isVisualizerTriggered ||
+            (isHapticActive && (isSelected || profile == BeatProfile.AMPLITUDE))
+
 
     var latchTriggered by remember { mutableStateOf(false) }
     
@@ -264,20 +328,28 @@ fun ProfileIndicatorIcon(profile: BeatProfile, isVisualizerTriggered: Boolean, i
 
     LaunchedEffect(isCurrentlyTriggered) {
         if (isCurrentlyTriggered) {
+            val timeSincePause = if (hState.pauseStartTime > 0) System.currentTimeMillis() - hState.pauseStartTime else Long.MAX_VALUE
+            
             latchTriggered = true
-            delay(SettingsManager.latchDurationMs.toLong())
+            
+            if (timeSincePause > SettingsManager.latchDurationMs) {
+                delay(SettingsManager.latchDurationMs.toLong())
+            }
+
             latchTriggered = false
         }
     }
 
     // displayTriggered stays true if either the live check or the latch is active.
-    // This fixes the Amplitude icon staying at 100% alpha when continuously above threshold.
     val displayTriggered = isCurrentlyTriggered || latchTriggered
-    val targetAlpha = if (displayTriggered) SettingsManager.visualizerTriggeredAlpha.coerceAtLeast(SettingsManager.minIconAlpha) else 1.0f
+    val targetAlpha = when {
+        SettingsManager.invertVisualizerAlpha -> if (displayTriggered) 1.0f else SettingsManager.visualizerTriggeredAlpha.coerceAtLeast(SettingsManager.minIconAlpha)
+        else -> if (displayTriggered) SettingsManager.visualizerTriggeredAlpha.coerceAtLeast(SettingsManager.minIconAlpha) else 1.0f
+    }
     
     val animatedAlpha by animateFloatAsState(
         targetValue = targetAlpha,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "iconAlpha"
     )
 
@@ -301,13 +373,17 @@ fun ProfileIndicatorIcon(profile: BeatProfile, isVisualizerTriggered: Boolean, i
             modifier = Modifier
                 .size(15.dp)
                 .graphicsLayer {
+                    this.alpha = animatedAlpha
                     if (isSelected && isHapticActive) {
                         rotationZ = wobbleAngle
                         scaleX = 1.3f
                         scaleY = 1.3f
+                    } else {
+                        rotationZ = 0f
+                        scaleX = 1f
+                        scaleY = 1f
                     }
                 }
-                .alpha(animatedAlpha)
         )
     }
 }
@@ -317,12 +393,12 @@ fun VisualizerBar(intensity: Float, color: Color, alpha: Float, modifier: Modifi
     val minHeight = 0.04f
     val animatedHeight by animateFloatAsState(
         targetValue = intensity.coerceIn(minHeight, 1f),
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "barHeight"
     )
     val animatedAlpha by animateFloatAsState(
         targetValue = alpha,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "barAlpha"
     )
     Box(
@@ -337,7 +413,7 @@ fun VisualizerProgressBar(label: String, intensity: Float) {
     val minWidth = 0.02f
     val animatedIntensity by animateFloatAsState(
         targetValue = intensity.coerceIn(minWidth, 1f),
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "progressIntensity"
     )
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -363,7 +439,7 @@ fun VisualizerProgressBar(label: String, intensity: Float) {
 fun VisualizerIcon(onRes: Int, offRes: Int, intensity: Float, label: String? = null, size: androidx.compose.ui.unit.Dp = 32.dp) {
     val animatedIntensity by animateFloatAsState(
         targetValue = intensity,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "iconIntensity"
     )
     val alpha = SettingsManager.minIconAlpha + (animatedIntensity * (1.0f - SettingsManager.minIconAlpha))

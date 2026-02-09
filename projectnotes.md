@@ -74,6 +74,21 @@ This document contains technical details, architectural decisions, and developme
 - **Slider Snapping**: Configurable snapping increments for intensity, volume, and sensitivity controls to ensure precise user adjustments.
 - **Smoothing**: All visual feedback uses non-bouncy, low-stiffness spring animations for a calming effect.
 
+## Recent Updates - Visualizer & Settings Overhaul
+
+- **Feature:** Added extensive visualizer customization options in Settings.
+    - Sliders now available for icon trigger thresholds (Amplitude, Bass, Drum, Guitar).
+    - Added an option to invert icon alpha (bright on trigger).
+    - Visualizer now displays a secondary (red) line to indicate the icon trigger threshold.
+- **Feature:** Overhauled the "Slider Snapping" section in Settings.
+    - Grouped snapping options into "Whole Numbers" and "Decimals" for clarity.
+    - Added snapping controls for all new sliders.
+- **UI/UX:** All sliders throughout the app now display a tick mark indicating their default value.
+- **Fix:** Resolved a bug where the Amplitude icon would not trigger correctly when the visualizer bar passed its threshold.
+- **Fix:** Addressed animation glitches and inconsistencies that occurred on pausing and resuming the media player.
+- **Fix:** Improved responsiveness of all visualizer animations by adjusting animation stiffness.
+- **Refactor:** Clarified descriptions for settings to improve user understanding.
+
 ## Future Features & Ideas
 
 ### Multi-device Support

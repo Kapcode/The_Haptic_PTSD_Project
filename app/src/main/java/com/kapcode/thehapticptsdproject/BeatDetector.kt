@@ -483,6 +483,7 @@ object BeatDetector {
             isPlaying = false, 
             isPaused = true
         ) }
+        HapticManager.setPauseStartTime(System.currentTimeMillis())
     }
 
     fun resumePlayback() {
@@ -495,6 +496,7 @@ object BeatDetector {
                 nextBeatIndex = findNextBeatIndex(state.detectedBeats, state.currentTimestampMs)
             )
         }
+        HapticManager.setPauseStartTime(0)
     }
 
     fun seekTo(timestampMs: Long) {

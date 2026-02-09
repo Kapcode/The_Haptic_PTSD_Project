@@ -53,6 +53,12 @@ object SettingsManager {
     var visualizerTriggeredAlpha by mutableStateOf(0.1f)
     var minIconAlpha by mutableStateOf(0.2f)
     var latchDurationMs by mutableStateOf(200)
+    var invertVisualizerAlpha by mutableStateOf(false)
+    var triggerThresholdAmplitude by mutableStateOf(0.38f)
+    var triggerThresholdBass by mutableStateOf(0.48f)
+    var triggerThresholdDrum by mutableStateOf(0.48f)
+    var triggerThresholdGuitar by mutableStateOf(0.48f)
+
 
     // Experimental Switch
     var isExperimentalEnabled by mutableStateOf(false)
@@ -70,6 +76,8 @@ object SettingsManager {
     var snapIconAlpha by mutableStateOf(0f)
     var snapSyncOffset by mutableStateOf(0f)
     var snapLatchDuration by mutableStateOf(0f)
+    var snapTriggerThreshold by mutableStateOf(0f)
+
 
     // Logging
     var logToLogcat by mutableStateOf(false)
@@ -108,6 +116,11 @@ object SettingsManager {
         visualizerTriggeredAlpha = prefs.getFloat("visualizer_triggered_alpha", 0.1f)
         minIconAlpha = prefs.getFloat("min_icon_alpha", 0.2f)
         latchDurationMs = prefs.getInt("latch_duration", 200)
+        invertVisualizerAlpha = prefs.getBoolean("invert_visualizer_alpha", false)
+        triggerThresholdAmplitude = prefs.getFloat("trigger_threshold_amplitude", 0.38f)
+        triggerThresholdBass = prefs.getFloat("trigger_threshold_bass", 0.48f)
+        triggerThresholdDrum = prefs.getFloat("trigger_threshold_drum", 0.48f)
+        triggerThresholdGuitar = prefs.getFloat("trigger_threshold_guitar", 0.48f)
         
         isExperimentalEnabled = prefs.getBoolean("experimental_enabled", false)
 
@@ -123,7 +136,8 @@ object SettingsManager {
         snapIconAlpha = prefs.getFloat("snap_icon_alpha", 0f)
         snapSyncOffset = prefs.getFloat("snap_sync_offset", 0f)
         snapLatchDuration = prefs.getFloat("snap_latch_duration", 0f)
-        
+        snapTriggerThreshold = prefs.getFloat("snap_trigger_threshold", 0f)
+
         logToLogcat = prefs.getBoolean("log_to_logcat", false)
         authorizedFolderUris = prefs.getStringSet("authorized_folder_uris", emptySet()) ?: emptySet()
     }
@@ -158,6 +172,11 @@ object SettingsManager {
             putFloat("visualizer_triggered_alpha", visualizerTriggeredAlpha)
             putFloat("min_icon_alpha", minIconAlpha)
             putInt("latch_duration", latchDurationMs)
+            putBoolean("invert_visualizer_alpha", invertVisualizerAlpha)
+            putFloat("trigger_threshold_amplitude", triggerThresholdAmplitude)
+            putFloat("trigger_threshold_bass", triggerThresholdBass)
+            putFloat("trigger_threshold_drum", triggerThresholdDrum)
+            putFloat("trigger_threshold_guitar", triggerThresholdGuitar)
             
             putBoolean("experimental_enabled", isExperimentalEnabled)
 
@@ -173,6 +192,7 @@ object SettingsManager {
             putFloat("snap_icon_alpha", snapIconAlpha)
             putFloat("snap_sync_offset", snapSyncOffset)
             putFloat("snap_latch_duration", snapLatchDuration)
+            putFloat("snap_trigger_threshold", snapTriggerThreshold)
             putBoolean("log_to_logcat", logToLogcat)
             putStringSet("authorized_folder_uris", authorizedFolderUris)
             apply()
@@ -206,6 +226,11 @@ object SettingsManager {
         visualizerTriggeredAlpha = 0.1f
         minIconAlpha = 0.2f
         latchDurationMs = 200
+        invertVisualizerAlpha = false
+        triggerThresholdAmplitude = 0.38f
+        triggerThresholdBass = 0.48f
+        triggerThresholdDrum = 0.48f
+        triggerThresholdGuitar = 0.48f
         
         isExperimentalEnabled = false
         
@@ -221,6 +246,7 @@ object SettingsManager {
         snapIconAlpha = 0f
         snapSyncOffset = 0f
         snapLatchDuration = 0f
+        snapTriggerThreshold = 0f
         
         save()
     }

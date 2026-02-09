@@ -18,6 +18,7 @@ import com.kapcode.thehapticptsdproject.composables.FileItem
 import com.kapcode.thehapticptsdproject.composables.FolderItem
 import com.kapcode.thehapticptsdproject.composables.InPlayerHapticVisualizer
 import com.kapcode.thehapticptsdproject.composables.SectionCard
+import com.kapcode.thehapticptsdproject.composables.SliderWithTick
 
 fun BeatProfile.getColor(): Color = when(this) {
     BeatProfile.AMPLITUDE -> Color.Cyan
@@ -141,24 +142,28 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
 
             Spacer(modifier = Modifier.height(8.dp))
             Text("Max Haptic Intensity: ${(SettingsManager.beatMaxIntensity * 100).toInt()}%")
-            Slider(
+            SliderWithTick(
                 value = SettingsManager.beatMaxIntensity,
                 onValueChange = { 
                     SettingsManager.beatMaxIntensity = applySnap(it, SettingsManager.snapBeatMaxIntensity)
                     SettingsManager.save()
                     BeatDetector.updateMasterIntensity(SettingsManager.beatMaxIntensity)
-                }
+                },
+                valueRange = 0f..1f,
+                defaultValue = 1.0f
             )
 
             Spacer(modifier = Modifier.height(8.dp))
             Text("Media Volume: ${(SettingsManager.mediaVolume * 100).toInt()}%")
-            Slider(
+            SliderWithTick(
                 value = SettingsManager.mediaVolume,
                 onValueChange = { 
                     SettingsManager.mediaVolume = applySnap(it, SettingsManager.snapVolume)
                     SettingsManager.save()
                     BeatDetector.updateMediaVolume(SettingsManager.mediaVolume)
-                }
+                },
+                valueRange = 0f..1f,
+                defaultValue = 1.0f
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -207,13 +212,14 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                     
                     if (SettingsManager.showOffsetSlider) {
                         Text("Sync Offset: ${SettingsManager.hapticSyncOffsetMs}ms", style = MaterialTheme.typography.bodySmall)
-                        Slider(
+                        SliderWithTick(
                             value = SettingsManager.hapticSyncOffsetMs.toFloat(),
                             onValueChange = { 
                                 SettingsManager.hapticSyncOffsetMs = applySnap(it, SettingsManager.snapSyncOffset).toInt()
                                 SettingsManager.save()
                             },
                             valueRange = -200f..200f,
+                            defaultValue = 60f,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

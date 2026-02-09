@@ -26,9 +26,10 @@ A high-resolution, 32-band frequency visualizer available in-app and via persist
 - **Channel Intensity (L/R)**: Real-time volume levels for left and right channels.
 - **Waveform**: A fluid background representation of the overall audio energy.
 - **Color Coding**: Cyan (Amplitude), Tan (Bass), Orange (Drum), and Grass Green (Guitar) help identify exactly which sounds are driving your grounding feedback.
+- **Dual Threshold Lines**: The visualizer now displays both the bar's trigger threshold (White) and the icon's animation threshold (Red), providing a clear visual distinction between the two.
 
 ### Smooth, Calming Animations
-All visual feedback—including frequency bars, haptic icons, and progress indicators—uses non-bouncy, low-stiffness spring animations. Active profiles now feature a "wobble" effect when triggered, providing a clear visual link between the sound and the haptic pulse.
+All visual feedback—including frequency bars, haptic icons, and progress indicators—uses non-bouncy, medium-stiffness spring animations for a more responsive feel. Active profiles now feature a "wobble" effect when triggered, providing a clear visual link between the sound and the haptic pulse.
 
 ### Intelligent Auto-Selection & Management
 The app automatically prepares your therapeutic environment by choosing the best available audio track on startup. It prioritizes previously analyzed files and remembers your last played track. 
@@ -37,8 +38,9 @@ The app automatically prepares your therapeutic environment by choosing the best
 Full media playback controls are integrated directly into the persistent notification. This allows you to play, pause, stop, and skip forward or backward by 5 or 30 seconds without needing to open the app.
 
 ### Persistent Customization & Precision Controls
-- **Slider Snapping**: All sensitive controls (Intensity, Volume, Sensitivity) feature configurable snapping increments for predictable and consistent adjustments.
-- **Visualizer Gain**: Independent gain controls for each frequency range allow you to tailor the visual feedback to your specific hearing or hardware needs.
+- **Slider Snapping**: All sensitive controls (Intensity, Volume, Sensitivity) feature configurable snapping increments for predictable and consistent adjustments. The snapping settings are now grouped by "Whole Numbers" and "Decimals" for clarity.
+- **Visualizer Gain & Thresholds**: Independent gain and icon trigger threshold controls for each frequency range allow you to tailor the visual feedback to your specific hearing or hardware needs.
+- **Inverted Alpha**: An option to invert the icon alpha, making them bright when triggered instead of dim.
 - **Reset to Defaults**: Quickly revert all settings to factory configurations with a single tap.
 - **Experimental Features Toggle**: Hide complex or beta tools like Squeeze Detection to maintain a focused, distraction-free interface for daily use.
 

@@ -30,7 +30,8 @@ data class HapticState(
 
     // Live visualizer data
     val visualizerData: FloatArray = FloatArray(32) { 0f },
-    val resetCounter: Int = 0
+    val resetCounter: Int = 0,
+    val pauseStartTime: Long = 0
 )
 
 object HapticManager {
@@ -49,6 +50,10 @@ object HapticManager {
             leadOutMs = SettingsManager.hapticLeadOutMs
         )
         startVisualizerResetLoop()
+    }
+    
+    fun setPauseStartTime(time: Long) {
+        _state.value = _state.value.copy(pauseStartTime = time)
     }
 
     private fun startVisualizerResetLoop() {
