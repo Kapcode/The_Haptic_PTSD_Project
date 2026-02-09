@@ -24,10 +24,10 @@ A high-resolution, 32-band frequency visualizer available in-app and via persist
 - **Tan**: Bass Range
 - **Orange**: Drum Range
 - **Grass Green**: Guitar Range
-Includes profile-specific icons beneath the frequency bands to indicate which ranges are currently being monitored.
+The visualizer includes profile-specific icons beneath each frequency range. When audio intensity in a specific range exceeds the detection threshold, the corresponding bars smoothly transition their transparency (alpha) to provide subtle, real-time feedback.
 
 ### Smooth, Calming Animations
-All visual feedback—including frequency bars, haptic icons, and progress indicators—uses non-bouncy, low-stiffness spring animations. This ensures that visual transitions are fluid and glide between states, avoiding abrupt flashing or jarring movements.
+All visual feedback—including frequency bars, haptic icons, and progress indicators—uses non-bouncy, low-stiffness spring animations. This ensures that visual transitions are fluid and glide between states, avoiding abrupt flashing or jarring movements to maintain a stress-relieving environment.
 
 ### Intelligent Auto-Selection
 The app automatically prepares your therapeutic environment by choosing the best available audio track. It prioritizes previously analyzed files (choosing the shortest ones for quick sessions) and remembers your last played track, ensuring support is always one tap away.

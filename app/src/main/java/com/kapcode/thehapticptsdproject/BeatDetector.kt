@@ -387,16 +387,50 @@ object BeatDetector {
                                     magnitudes[i] = sqrt(re * re + im * im) / 128f
                                 }
                                 
-                                // Group into 32 bands
+                                // Group into 32 bands with non-linear mapping to match profile ranges
                                 val bands = FloatArray(32)
-                                val bandSize = n / 32
-                                for (i in 0 until 32) {
+                                
+                                // Band 0: Overall Amplitude (Full spectrum average)
+                                var totalSum = 0f
+                                magnitudes.forEach { totalSum += it }
+                                bands[0] = (totalSum / n) * 3f
+                                
+                                // Bands 1-2: Bass Range (Bins 1-5)
+                                for (i in 1..2) {
+                                    val startBin = 1 + (i - 1) * 2
                                     var sum = 0f
-                                    for (j in 0 until bandSize) {
-                                        sum += magnitudes[i * bandSize + j]
-                                    }
-                                    bands[i] = (sum / bandSize) * 2f // Scale up for visibility
+                                    for (j in 0 until 2) sum += magnitudes[startBin + j]
+                                    bands[i] = (sum / 2) * 2.5f
                                 }
+                                
+                                // Bands 3-5: Drum Range (Bins 6-15)
+                                for (i in 3..5) {
+                                    val startBin = 6 + (i - 3) * 3
+                                    var sum = 0f
+                                    for (j in 0 until 3) sum += magnitudes[startBin + j]
+                                    bands[i] = (sum / 3) * 2.2f
+                                }
+                                
+                                // Bands 6-12: Guitar Range (Bins 16-40)
+                                for (i in 6..12) {
+                                    val startBin = 16 + (i - 6) * 4
+                                    var sum = 0f
+                                    for (j in 0 until 4) sum += magnitudes[startBin + j]
+                                    bands[i] = (sum / 4) * 1.8f
+                                }
+                                
+                                // Bands 13-31: Highs (Bins 41-511)
+                                val remainingBins = n - 41
+                                val bandSizeHigh = (remainingBins / 19).coerceAtLeast(1)
+                                for (i in 13..31) {
+                                    val startBin = 41 + (i - 13) * bandSizeHigh
+                                    var sum = 0f
+                                    for (j in 0 until bandSizeHigh) {
+                                        if (startBin + j < n) sum += magnitudes[startBin + j]
+                                    }
+                                    bands[i] = (sum / bandSizeHigh) * 1.5f
+                                }
+
                                 HapticManager.updateVisualizer(bands)
                             }
                         } else if (SettingsManager.visualizerType == VisualizerType.CHANNEL_INTENSITY) {

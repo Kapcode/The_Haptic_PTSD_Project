@@ -113,13 +113,28 @@ fun InPlayerHapticVisualizer() {
                             verticalAlignment = Alignment.Bottom
                         ) {
                             hState.visualizerData.forEachIndexed { index, intensity ->
-                                val color = when {
-                                    index == 0 -> BeatProfile.AMPLITUDE.getColor()
-                                    index in 1..2 -> BeatProfile.BASS.getColor()
-                                    index in 3..5 -> BeatProfile.DRUM.getColor()
-                                    index in 6..12 -> BeatProfile.GUITAR.getColor()
-                                    else -> MaterialTheme.colorScheme.primary
+                                val profile = when {
+                                    index == 0 -> BeatProfile.AMPLITUDE
+                                    index in 1..2 -> BeatProfile.BASS
+                                    index in 3..5 -> BeatProfile.DRUM
+                                    index in 6..12 -> BeatProfile.GUITAR
+                                    else -> null
                                 }
+                                
+                                val threshold = when(profile) {
+                                    BeatProfile.AMPLITUDE -> 0.4f // Approximate based on logic
+                                    BeatProfile.BASS -> 0.5f
+                                    BeatProfile.DRUM -> 0.5f
+                                    BeatProfile.GUITAR -> 0.5f
+                                    else -> 1.0f
+                                }
+
+                                val isAboveThreshold = intensity > threshold
+                                val baseColor = profile?.getColor() ?: MaterialTheme.colorScheme.primary
+                                
+                                // Threshold color: White for "peak" feedback
+                                val color = if (isAboveThreshold && profile != null) Color.White else baseColor
+
                                 VisualizerBar(intensity = intensity, color = color, modifier = Modifier.weight(1f))
                             }
                         }
