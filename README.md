@@ -1,12 +1,12 @@
 # The Haptic PTSD Project
 
-The Haptic PTSD Project is an innovative Android application designed to provide immediate, non-invasive support for individuals managing PTSD and sleep-related distress. By combining tactile grounding techniques with advanced on-device sensing, the app offers a digital "anchor" during moments of anxiety or restlessness.
+The Haptic PTSD Project is an innovative Android application designed to provide immediate, non-invasive support for individuals managing PTSD and sleep-related distress. By combining tactile grounding techniques with advanced on-device sensing and color-coded visual feedback, the app offers a digital "anchor" during moments of anxiety or restlessness.
 
 ## Core Purpose
 
 The application aims to provide physiological regulation through:
 - **Active Heartbeat Mode:** Immediate grounding triggered by either a physical squeeze or a sharp "wrist snap" movement.
-- **Bilateral Beat Player:** Immersive, synchronized haptics that follow the rhythm of your own audio tracks, using multiple analysis profiles (Bass, Guitar, Amplitude).
+- **Bilateral Beat Player:** Immersive, synchronized haptics that follow the rhythm of your own audio tracks, using multiple analysis profiles (Bass, Drum, Guitar, Amplitude).
 - **Background Operation:** Designed to work while the app is out of focus or the screen is off, providing continuous support as you drift off to sleep.
 - **Privacy-Centric Monitoring:** Continuous sensing of triggers using local, private analysis that never sends data to the cloud.
 
@@ -18,17 +18,22 @@ A primary therapeutic feature where the user activates a comforting, rhythmic "h
 ### Bilateral Beat Player
 Analyze any audio file from your library to generate a custom haptic profile. The app uses advanced signal processing to "feel" the music, providing synchronized tactile feedback that matches the intensity and duration of detected transients. Supports automatic caching for instant re-play.
 
+### Advanced Audio Visualizer
+A high-resolution, 32-band frequency visualizer available in-app and via persistent notification. It features color-coded ranges that correspond to detection profiles:
+- **Cyan**: Overall Amplitude
+- **Tan**: Bass Range
+- **Orange**: Drum Range
+- **Grass Green**: Guitar Range
+Includes profile-specific icons beneath the frequency bands to indicate which ranges are currently being monitored.
+
+### Smooth, Calming Animations
+All visual feedback—including frequency bars, haptic icons, and progress indicators—uses non-bouncy, low-stiffness spring animations. This ensures that visual transitions are fluid and glide between states, avoiding abrupt flashing or jarring movements.
+
 ### Intelligent Auto-Selection
 The app automatically prepares your therapeutic environment by choosing the best available audio track. It prioritizes previously analyzed files (choosing the shortest ones for quick sessions) and remembers your last played track, ensuring support is always one tap away.
 
-### Live Haptic Visualizer
-Real-time visual feedback of the haptic engine's output, available both as a dedicated card in the app and as part of a persistent notification. This provides clear confirmation of when the app is generating vibrations, featuring animations for both phone and external motor motors.
-
 ### Notification Media Controls
 Full media playback controls are integrated directly into the persistent notification. This allows you to play, pause, stop, and skip forward or backward by 5 or 30 seconds without needing to open the app. The controls are synchronized with the in-app player.
-
-### Intelligent Sleep Assistance (Planned)
-Specialized, rhythmic haptic sessions designed to assist in falling asleep and maintaining sleep quality. The app is evolving to detect signs of tremors or night terrors and respond with gentle tactile interventions.
 
 ### Persistent Customization & Calibration
 The app includes precision calibration tools for both acoustic pressure detection and motion sensitivity. All preferences—intensity, BPM, lead-in/out timing, and detection thresholds—are automatically saved.
@@ -49,7 +54,3 @@ Built for the most sensitive contexts, all detection and analysis happen locally
 ## Requirements
 - Android 11 (API 30) or higher.
 - Physical device required for haptic and sensor functionality.
-
-## Future Exploration
-- Bilateral Stimulation: Support for dual-device connectivity via Bluetooth to provide alternating pulses on each arm.
-- Picture-in-Picture (PiP) Visualizer: Expanding the visualizer to a floating window for continuous feedback while using other apps.

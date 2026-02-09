@@ -26,7 +26,10 @@ data class HapticState(
     val controllerLeftTopIntensity: Float = 0f,
     val controllerLeftBottomIntensity: Float = 0f,
     val controllerRightTopIntensity: Float = 0f,
-    val controllerRightBottomIntensity: Float = 0f
+    val controllerRightBottomIntensity: Float = 0f,
+
+    // Live visualizer data
+    val visualizerData: FloatArray = FloatArray(32) { 0f } // Increased to 32 bands
 )
 
 object HapticManager {
@@ -53,17 +56,24 @@ object HapticManager {
             while (isActive) {
                 delay(50)
                 val current = _state.value
-                if (current.phoneLeftIntensity > 0 || current.phoneRightIntensity > 0 ||
+                
+                val hasMotorActivity = current.phoneLeftIntensity > 0 || current.phoneRightIntensity > 0 ||
                     current.controllerLeftTopIntensity > 0 || current.controllerLeftBottomIntensity > 0 ||
-                    current.controllerRightTopIntensity > 0 || current.controllerRightBottomIntensity > 0) {
+                    current.controllerRightTopIntensity > 0 || current.controllerRightBottomIntensity > 0
+                
+                val hasVisualizerActivity = current.visualizerData.any { it > 0f }
 
+                if (hasMotorActivity || hasVisualizerActivity) {
+                    val newVisualizerData = current.visualizerData.map { (it - 0.10f).coerceAtLeast(0f) }.toFloatArray()
+                    
                     _state.value = current.copy(
-                        phoneLeftIntensity = (current.phoneLeftIntensity - 0.1f).coerceAtLeast(0f),
-                        phoneRightIntensity = (current.phoneRightIntensity - 0.1f).coerceAtLeast(0f),
-                        controllerLeftTopIntensity = (current.controllerLeftTopIntensity - 0.1f).coerceAtLeast(0f),
-                        controllerLeftBottomIntensity = (current.controllerLeftBottomIntensity - 0.1f).coerceAtLeast(0f),
-                        controllerRightTopIntensity = (current.controllerRightTopIntensity - 0.1f).coerceAtLeast(0f),
-                        controllerRightBottomIntensity = (current.controllerRightBottomIntensity - 0.1f).coerceAtLeast(0f)
+                        phoneLeftIntensity = (current.phoneLeftIntensity - 0.15f).coerceAtLeast(0f),
+                        phoneRightIntensity = (current.phoneRightIntensity - 0.15f).coerceAtLeast(0f),
+                        controllerLeftTopIntensity = (current.controllerLeftTopIntensity - 0.15f).coerceAtLeast(0f),
+                        controllerLeftBottomIntensity = (current.controllerLeftBottomIntensity - 0.15f).coerceAtLeast(0f),
+                        controllerRightTopIntensity = (current.controllerRightTopIntensity - 0.15f).coerceAtLeast(0f),
+                        controllerRightBottomIntensity = (current.controllerRightBottomIntensity - 0.15f).coerceAtLeast(0f),
+                        visualizerData = newVisualizerData
                     )
                 }
             }
@@ -227,6 +237,10 @@ object HapticManager {
             controllerRightTopIntensity = rightTop.coerceIn(0f, 1f),
             controllerRightBottomIntensity = rightBottom.coerceIn(0f, 1f)
         )
+    }
+
+    fun updateVisualizer(data: FloatArray) {
+        _state.value = _state.value.copy(visualizerData = data)
     }
 
     private fun sendIntentToService(action: String, extras: Intent.() -> Unit = {}) {

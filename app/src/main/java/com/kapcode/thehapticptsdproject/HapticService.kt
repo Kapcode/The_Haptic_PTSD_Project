@@ -17,6 +17,7 @@ import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.view.View
 import android.widget.RemoteViews
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
@@ -70,8 +71,8 @@ class HapticService : Service(), SensorEventListener {
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate() {
         super.onCreate()
-        HapticManager.init(this)
         SettingsManager.init(this)
+        HapticManager.init(this)
 
         val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
         vibrator = vibratorManager.defaultVibrator
@@ -95,7 +96,8 @@ class HapticService : Service(), SensorEventListener {
                 val anyActive = hState.isHeartbeatRunning || bState.isPlaying || hState.isTestRunning || 
                                 hState.phoneLeftIntensity > 0 || hState.phoneRightIntensity > 0 ||
                                 hState.controllerLeftTopIntensity > 0 || hState.controllerLeftBottomIntensity > 0 ||
-                                hState.controllerRightTopIntensity > 0 || hState.controllerRightBottomIntensity > 0
+                                hState.controllerRightTopIntensity > 0 || hState.controllerRightBottomIntensity > 0 ||
+                                hState.visualizerData.any { it > 0 }
 
                 if (anyActive && visualizerRefreshJob == null) {
                     startVisualizerRefreshLoop()
@@ -206,8 +208,36 @@ class HapticService : Service(), SensorEventListener {
             setInt(R.id.img_controller_right_top, "setAlpha", getAlpha(hState.controllerRightTopIntensity))
             setInt(R.id.img_controller_right_bottom, "setAlpha", getAlpha(hState.controllerRightBottomIntensity))
 
+            // Visualizer Type handling
+            val vType = SettingsManager.visualizerType
+            setViewVisibility(R.id.layout_bars, if (vType == VisualizerType.VERTICAL_BARS) View.VISIBLE else View.GONE)
+            setViewVisibility(R.id.layout_intensity, if (vType == VisualizerType.CHANNEL_INTENSITY) View.VISIBLE else View.GONE)
+            setViewVisibility(R.id.layout_waveform, if (vType == VisualizerType.WAVEFORM) View.VISIBLE else View.GONE)
+
+            when (vType) {
+                VisualizerType.VERTICAL_BARS -> {
+                    val bars = arrayOf(R.id.bar1, R.id.bar2, R.id.bar3, R.id.bar4, R.id.bar5, R.id.bar6, R.id.bar7, R.id.bar8)
+                    for (i in bars.indices) {
+                        val progress = if (i < hState.visualizerData.size) (hState.visualizerData[i] * 100).toInt() else 0
+                        setProgressBar(bars[i], 100, progress.coerceIn(0, 100), false)
+                    }
+                }
+                VisualizerType.CHANNEL_INTENSITY -> {
+                    val leftIntensity = if (hState.visualizerData.isNotEmpty()) hState.visualizerData[0] else 0f
+                    val rightIntensity = if (hState.visualizerData.size > 1) hState.visualizerData[1] else leftIntensity
+                    setProgressBar(R.id.progress_left, 100, (leftIntensity * 100).toInt().coerceIn(0, 100), false)
+                    setProgressBar(R.id.progress_right, 100, (rightIntensity * 100).toInt().coerceIn(0, 100), false)
+                }
+                VisualizerType.WAVEFORM -> {
+                    // For waveform, we approximate by showing a pulsing line height or alpha
+                    // Real waveforms are hard in RemoteViews without Bitmaps.
+                    val overallIntensity = hState.visualizerData.average().toFloat()
+                    setInt(R.id.waveform_line, "setAlpha", getAlpha(overallIntensity))
+                }
+            }
+
             if (bState.isPlaying || bState.isPaused) {
-                setViewVisibility(R.id.player_controls, android.view.View.VISIBLE)
+                setViewVisibility(R.id.player_controls, View.VISIBLE)
                 setProgressBar(R.id.player_progress, bState.totalDurationMs.toInt(), bState.currentTimestampMs.toInt(), false)
                 
                 val ppIcon = if (bState.isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
@@ -222,7 +252,7 @@ class HapticService : Service(), SensorEventListener {
                 setOnClickPendingIntent(R.id.btn_forward_5, createPendingAction(ACTION_SKIP_FWD_5))
                 setOnClickPendingIntent(R.id.btn_forward_30, createPendingAction(ACTION_SKIP_FWD_30))
             } else {
-                setViewVisibility(R.id.player_controls, android.view.View.GONE)
+                setViewVisibility(R.id.player_controls, View.GONE)
             }
         }
 

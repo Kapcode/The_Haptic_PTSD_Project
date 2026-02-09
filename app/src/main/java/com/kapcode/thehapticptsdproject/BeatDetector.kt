@@ -6,6 +6,7 @@ import android.media.MediaPlayer
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.media.audiofx.Visualizer
 import android.net.Uri
 import android.os.Build
 import android.provider.DocumentsContract
@@ -84,6 +85,7 @@ object BeatDetector {
     val playerState = _playerState.asStateFlow()
 
     private var mediaPlayer: MediaPlayer? = null
+    private var visualizer: Visualizer? = null
     private var playbackJob: Job? = null
     private var analysisJob: Job? = null
     private val analysisLock = AtomicBoolean(false)
@@ -341,6 +343,9 @@ object BeatDetector {
             prepare()
             val volume = _playerState.value.mediaVolume
             setVolume(volume, volume)
+            
+            setupVisualizer(audioSessionId)
+            
             start()
         }
 
@@ -352,6 +357,65 @@ object BeatDetector {
         ) }
 
         startPlaybackJob()
+    }
+
+    private fun setupVisualizer(audioSessionId: Int) {
+        try {
+            visualizer = Visualizer(audioSessionId).apply {
+                captureSize = Visualizer.getCaptureSizeRange()[1]
+                setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
+                    override fun onWaveFormDataCapture(visualizer: Visualizer?, waveform: ByteArray?, samplingRate: Int) {
+                        if (SettingsManager.visualizerType == VisualizerType.WAVEFORM) {
+                            waveform?.let {
+                                val floatData = FloatArray(it.size)
+                                for (i in it.indices) {
+                                    floatData[i] = ((it[i].toInt() and 0xFF) - 128) / 128f
+                                }
+                                HapticManager.updateVisualizer(floatData)
+                            }
+                        }
+                    }
+
+                    override fun onFftDataCapture(visualizer: Visualizer?, fft: ByteArray?, samplingRate: Int) {
+                        if (SettingsManager.visualizerType == VisualizerType.VERTICAL_BARS) {
+                            fft?.let {
+                                val n = it.size / 2
+                                val magnitudes = FloatArray(n)
+                                for (i in 0 until n) {
+                                    val re = it[i * 2].toFloat()
+                                    val im = it[i * 2 + 1].toFloat()
+                                    magnitudes[i] = sqrt(re * re + im * im) / 128f
+                                }
+                                
+                                // Group into 32 bands
+                                val bands = FloatArray(32)
+                                val bandSize = n / 32
+                                for (i in 0 until 32) {
+                                    var sum = 0f
+                                    for (j in 0 until bandSize) {
+                                        sum += magnitudes[i * bandSize + j]
+                                    }
+                                    bands[i] = (sum / bandSize) * 2f // Scale up for visibility
+                                }
+                                HapticManager.updateVisualizer(bands)
+                            }
+                        } else if (SettingsManager.visualizerType == VisualizerType.CHANNEL_INTENSITY) {
+                            fft?.let {
+                                var sum = 0f
+                                for (i in it.indices) {
+                                    sum += abs(it[i].toFloat())
+                                }
+                                val intensity = (sum / it.size / 128f) * 3f
+                                HapticManager.updateVisualizer(floatArrayOf(intensity, intensity))
+                            }
+                        }
+                    }
+                }, Visualizer.getMaxCaptureRate() / 2, true, true)
+                enabled = true
+            }
+        } catch (e: Exception) {
+            Logger.error("Visualizer Error: ${e.message}")
+        }
     }
 
     private fun startPlaybackJob() {
@@ -387,11 +451,13 @@ object BeatDetector {
 
     fun pausePlayback() {
         mediaPlayer?.pause()
+        visualizer?.enabled = false
         _playerState.update { it.copy(isPlaying = false, isPaused = true) }
     }
 
     fun resumePlayback() {
         mediaPlayer?.start()
+        visualizer?.enabled = true
         _playerState.update { state ->
             state.copy(
                 isPlaying = true,
@@ -429,12 +495,16 @@ object BeatDetector {
         
         HapticManager.playPulse(
             intensityOverride = scaledIntensity,
-            durationMs = beat.durationMs.toLong()
+            durationMs = beat.durationMs.toLong(),
+            channel = beat.channel
         )
     }
 
     fun stopPlayback() {
         playbackJob?.cancel()
+        visualizer?.enabled = false
+        visualizer?.release()
+        visualizer = null
         mediaPlayer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null

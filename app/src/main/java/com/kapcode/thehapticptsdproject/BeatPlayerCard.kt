@@ -4,16 +4,13 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -21,6 +18,20 @@ import com.kapcode.thehapticptsdproject.composables.FileItem
 import com.kapcode.thehapticptsdproject.composables.FolderItem
 import com.kapcode.thehapticptsdproject.composables.InPlayerHapticVisualizer
 import com.kapcode.thehapticptsdproject.composables.SectionCard
+
+fun BeatProfile.getColor(): Color = when(this) {
+    BeatProfile.AMPLITUDE -> Color.Cyan
+    BeatProfile.BASS -> Color(0xFFD2B48C) // Tan
+    BeatProfile.DRUM -> Color(0xFFFFA500) // Orange
+    BeatProfile.GUITAR -> Color(0xFF4CAF50) // Grass Green
+}
+
+fun BeatProfile.getIcon(): ImageVector = when(this) {
+    BeatProfile.AMPLITUDE -> Icons.Default.GraphicEq
+    BeatProfile.BASS -> Icons.Default.Speaker
+    BeatProfile.DRUM -> Icons.Default.Album
+    BeatProfile.GUITAR -> Icons.Default.MusicNote
+}
 
 @Composable
 fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
@@ -87,16 +98,34 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
             ) {
                 Box(modifier = Modifier.weight(1f)) {
                     var expanded by remember { mutableStateOf(false) }
-                    OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+                    
+                    val profileColor = selectedProfile.getColor()
+
+                    OutlinedButton(
+                        onClick = { expanded = true }, 
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = profileColor)
+                    ) {
+                        Icon(selectedProfile.getIcon(), contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
                         Text("Profile: ${selectedProfile.name}")
                         Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                     }
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         BeatProfile.values().forEach { profile ->
-                            DropdownMenuItem(text = { Text(profile.name) }, onClick = {
-                                vm.onProfileSelected(profile)
-                                expanded = false
-                            })
+                            DropdownMenuItem(
+                                text = { 
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(profile.getIcon(), contentDescription = null, tint = profile.getColor(), modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(profile.name, color = profile.getColor())
+                                    }
+                                },
+                                onClick = {
+                                    vm.onProfileSelected(profile)
+                                    expanded = false
+                                }
+                            )
                         }
                     }
                 }

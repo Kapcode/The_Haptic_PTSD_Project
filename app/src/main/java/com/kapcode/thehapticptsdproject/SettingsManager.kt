@@ -6,6 +6,12 @@ import android.net.Uri
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 
+enum class VisualizerType {
+    VERTICAL_BARS,
+    CHANNEL_INTENSITY,
+    WAVEFORM
+}
+
 object SettingsManager {
     private const val PREFS_NAME = "haptic_ptsd_prefs"
     
@@ -74,6 +80,11 @@ object SettingsManager {
     var lastPlayedAudioName: String?
         get() = prefs.getString("last_played_audio_name", null)
         set(value) = prefs.edit().putString("last_played_audio_name", value).apply()
+
+    // Visualizer Settings
+    var visualizerType: VisualizerType
+        get() = VisualizerType.valueOf(prefs.getString("visualizer_type", VisualizerType.VERTICAL_BARS.name) ?: VisualizerType.VERTICAL_BARS.name)
+        set(value) = prefs.edit().putString("visualizer_type", value.name).apply()
 
     // Snap Settings
     var snapIntensity: Float

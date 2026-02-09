@@ -16,7 +16,7 @@
             android:text="The Haptic PTSD Project"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
-            android:textSize="16sp" />
+            android:textSize="14sp" />
         <TextView
             android:id="@+id/notification_text"
             android:layout_width="wrap_content"
@@ -24,7 +24,7 @@
             android:layout_below="@id/notification_title"
             android:text="Detection Active"
             android:textColor="#CCCCCC"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
     </RelativeLayout>
 
     <LinearLayout
@@ -33,72 +33,141 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="horizontal"
-        android:layout_marginTop="8dp">
+        android:layout_marginTop="6dp">
 
         <ImageView
             android:id="@+id/img_phone_left"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:src="@drawable/phone_left_on"
-            android:layout_marginEnd="8dp" />
+            android:layout_marginEnd="6dp" />
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:layout_marginEnd="12dp">
+            android:layout_marginEnd="8dp">
             <ImageView
                 android:id="@+id/img_controller_left_top"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
                 android:src="@drawable/controller_left_on" />
             <ImageView
                 android:id="@+id/img_controller_left_bottom"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
                 android:src="@drawable/controller_left_on" />
         </LinearLayout>
+
+        <!-- Audio Visualizer Area -->
+        <FrameLayout
+            android:id="@+id/audio_visualizer_root"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="40dp"
+            android:layout_marginHorizontal="4dp">
+
+            <!-- Vertical Bars (Using ProgressBars with vertical orientation) -->
+            <LinearLayout
+                android:id="@+id/layout_bars"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="bottom"
+                android:visibility="visible">
+                <!-- We'll use scaling for these views or just stick to ProgressBars if we can find vertical style -->
+                <!-- Simple way: Vertical progress bars via rotation or custom style is hard in RemoteViews. -->
+                <!-- Let's use 8 ProgressBars with a vertical progress drawable if possible, or just height updates for API 31+ -->
+                <ProgressBar android:id="@+id/bar1" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:progressDrawable="@android:drawable/progress_horizontal" android:rotation="270" android:max="100"/>
+                <ProgressBar android:id="@+id/bar2" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:progressDrawable="@android:drawable/progress_horizontal" android:rotation="270" android:max="100"/>
+                <ProgressBar android:id="@+id/bar3" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:progressDrawable="@android:drawable/progress_horizontal" android:rotation="270" android:max="100"/>
+                <ProgressBar android:id="@+id/bar4" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:progressDrawable="@android:drawable/progress_horizontal" android:rotation="270" android:max="100"/>
+                <ProgressBar android:id="@+id/bar5" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:progressDrawable="@android:drawable/progress_horizontal" android:rotation="270" android:max="100"/>
+                <ProgressBar android:id="@+id/bar6" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:progressDrawable="@android:drawable/progress_horizontal" android:rotation="270" android:max="100"/>
+                <ProgressBar android:id="@+id/bar7" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:progressDrawable="@android:drawable/progress_horizontal" android:rotation="270" android:max="100"/>
+                <ProgressBar android:id="@+id/bar8" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:progressDrawable="@android:drawable/progress_horizontal" android:rotation="270" android:max="100"/>
+            </LinearLayout>
+
+            <!-- Channel Intensity Bars -->
+            <LinearLayout
+                android:id="@+id/layout_intensity"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:visibility="gone">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="2dp">
+                    <TextView android:layout_width="12dp" android:layout_height="wrap_content" android:text="L" android:textColor="#FFFFFF" android:textSize="9sp" />
+                    <ProgressBar android:id="@+id/progress_left" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="6dp" android:progressDrawable="@android:drawable/progress_horizontal" />
+                </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <TextView android:layout_width="12dp" android:layout_height="wrap_content" android:text="R" android:textColor="#FFFFFF" android:textSize="9sp" />
+                    <ProgressBar android:id="@+id/progress_right" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="6dp" android:progressDrawable="@android:drawable/progress_horizontal" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Waveform (using progress bars but arranged differently or just a single line) -->
+            <RelativeLayout
+                android:id="@+id/layout_waveform"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+                <ImageView
+                    android:id="@+id/waveform_line"
+                    android:layout_width="match_parent"
+                    android:layout_height="2dp"
+                    android:layout_centerInParent="true"
+                    android:background="#2196F3" />
+            </RelativeLayout>
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:layout_marginStart="12dp">
+            android:layout_marginStart="8dp">
             <ImageView
                 android:id="@+id/img_controller_right_top"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
                 android:src="@drawable/controller_right_on" />
             <ImageView
                 android:id="@+id/img_controller_right_bottom"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
                 android:src="@drawable/controller_right_on" />
         </LinearLayout>
 
         <ImageView
             android:id="@+id/img_phone_right"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:src="@drawable/phone_right_on"
-            android:layout_marginStart="8dp" />
+            android:layout_marginStart="6dp" />
     </LinearLayout>
 
-    <!-- BBPlayer Controls (Visible when playing) -->
+    <!-- BBPlayer Controls -->
     <LinearLayout
         android:id="@+id/player_controls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="6dp"
         android:visibility="gone">
 
         <ProgressBar
             android:id="@+id/player_progress"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="4dp"
-            android:layout_marginBottom="4dp"
+            android:layout_height="3dp"
+            android:layout_marginBottom="2dp"
             android:progressDrawable="@android:drawable/progress_horizontal" />
 
         <LinearLayout
@@ -109,55 +178,49 @@
 
             <ImageView
                 android:id="@+id/btn_replay_30"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:src="@android:drawable/ic_media_rew"
                 android:padding="4dp"
-                android:layout_marginEnd="8dp"
-                android:contentDescription="Replay 30s" />
+                android:layout_marginEnd="6dp" />
 
             <ImageView
                 android:id="@+id/btn_replay_5"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:src="@android:drawable/ic_media_previous"
                 android:padding="4dp"
-                android:layout_marginEnd="12dp"
-                android:contentDescription="Replay 5s" />
+                android:layout_marginEnd="10dp" />
 
             <ImageView
                 android:id="@+id/btn_play_pause"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:src="@android:drawable/ic_media_play"
-                android:padding="4dp"
-                android:contentDescription="Play/Pause" />
+                android:padding="4dp" />
 
             <ImageView
                 android:id="@+id/btn_stop"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:src="@android:drawable/ic_menu_close_clear_cancel"
-                android:padding="4dp"
-                android:contentDescription="Stop" />
+                android:padding="4dp" />
 
             <ImageView
                 android:id="@+id/btn_forward_5"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:src="@android:drawable/ic_media_next"
                 android:padding="4dp"
-                android:layout_marginStart="12dp"
-                android:contentDescription="Forward 5s" />
+                android:layout_marginStart="10dp" />
 
             <ImageView
                 android:id="@+id/btn_forward_30"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:src="@android:drawable/ic_media_ff"
                 android:padding="4dp"
-                android:layout_marginStart="8dp"
-                android:contentDescription="Forward 30s" />
+                android:layout_marginStart="6dp" />
 
         </LinearLayout>
     </LinearLayout>

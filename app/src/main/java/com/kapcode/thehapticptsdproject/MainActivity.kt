@@ -11,6 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -277,6 +278,39 @@ fun SettingsScreen() {
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
+        SectionCard(title = "Visual Feedback") {
+            var selectedType by remember { mutableStateOf(SettingsManager.visualizerType) }
+            Column {
+                Text("Notification Visualizer Type", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                VisualizerType.entries.forEach { type ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selectedType = type
+                                SettingsManager.visualizerType = type
+                            }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = selectedType == type, onClick = {
+                            selectedType = type
+                            SettingsManager.visualizerType = type
+                        })
+                        Spacer(Modifier.width(8.dp))
+                        Text(text = when(type) {
+                            VisualizerType.VERTICAL_BARS -> "Vertical Bars (Live HZ)"
+                            VisualizerType.CHANNEL_INTENSITY -> "Channel Intensity (L/R)"
+                            VisualizerType.WAVEFORM -> "Waveform (Live Audio)"
+                        })
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
         SectionCard(title = "Slider Snapping") {
             Column {
                 Text(
