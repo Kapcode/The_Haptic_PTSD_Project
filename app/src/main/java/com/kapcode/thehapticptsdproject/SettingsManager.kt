@@ -50,6 +50,15 @@ object SettingsManager {
     var lastPlayedAudioUri by mutableStateOf<String?>(null)
     var lastPlayedAudioName by mutableStateOf<String?>(null)
     var showOffsetSlider by mutableStateOf(false)
+    var seekbarTimeWindowMinutes by mutableStateOf(5)
+    var seekThumbWidth by mutableStateOf(12f)
+    var seekThumbHeight by mutableStateOf(48f)
+    var seekThumbAlpha by mutableStateOf(0.85f)
+    
+    var isRepeatEnabled by mutableStateOf(false)
+    var isRepeatAllEnabled by mutableStateOf(false)
+    var volumeBoost by mutableStateOf(1.0f)
+    var playbackSpeed by mutableStateOf(1.0f)
 
     // Device Assignments: Device -> Set of Profiles
     var deviceAssignments by mutableStateOf<Map<HapticDevice, Set<BeatProfile>>>(
@@ -125,6 +134,15 @@ object SettingsManager {
         lastPlayedAudioUri = prefs.getString("last_played_audio_uri", null)
         lastPlayedAudioName = prefs.getString("last_played_audio_name", null)
         showOffsetSlider = prefs.getBoolean("show_offset_slider", false)
+        seekbarTimeWindowMinutes = prefs.getInt("seekbar_time_window", 5)
+        seekThumbWidth = prefs.getFloat("seek_thumb_width", 12f)
+        seekThumbHeight = prefs.getFloat("seek_thumb_height", 48f)
+        seekThumbAlpha = prefs.getFloat("seek_thumb_alpha", 0.85f).coerceAtLeast(0.40f)
+        
+        isRepeatEnabled = prefs.getBoolean("is_repeat_enabled", false)
+        isRepeatAllEnabled = prefs.getBoolean("is_repeat_all_enabled", false)
+        volumeBoost = prefs.getFloat("volume_boost", 1.0f)
+        playbackSpeed = prefs.getFloat("playback_speed", 1.0f)
 
         val assignmentsJson = prefs.getString("device_assignments", null)
         if (assignmentsJson != null) {
@@ -196,6 +214,15 @@ object SettingsManager {
             putString("last_played_audio_uri", lastPlayedAudioUri)
             putString("last_played_audio_name", lastPlayedAudioName)
             putBoolean("show_offset_slider", showOffsetSlider)
+            putInt("seekbar_time_window", seekbarTimeWindowMinutes)
+            putFloat("seek_thumb_width", seekThumbWidth)
+            putFloat("seek_thumb_height", seekThumbHeight)
+            putFloat("seek_thumb_alpha", seekThumbAlpha)
+            
+            putBoolean("is_repeat_enabled", isRepeatEnabled)
+            putBoolean("is_repeat_all_enabled", isRepeatAllEnabled)
+            putFloat("volume_boost", volumeBoost)
+            putFloat("playback_speed", playbackSpeed)
 
             putString("device_assignments", Json.encodeToString(deviceAssignments))
 
@@ -258,6 +285,15 @@ object SettingsManager {
         beatMaxIntensity = 1.0f
         mediaVolume = 1.0f
         showOffsetSlider = false
+        seekbarTimeWindowMinutes = 5
+        seekThumbWidth = 12f
+        seekThumbHeight = 48f
+        seekThumbAlpha = 0.85f
+        
+        isRepeatEnabled = false
+        isRepeatAllEnabled = false
+        volumeBoost = 1.0f
+        playbackSpeed = 1.0f
         
         deviceAssignments = HapticDevice.entries.associateWith { setOf(BeatProfile.AMPLITUDE) }
 

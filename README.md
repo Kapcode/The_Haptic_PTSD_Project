@@ -17,9 +17,11 @@ A primary therapeutic feature where the user activates a comforting, rhythmic "h
 
 ### Bilateral Beat Player
 Analyze any audio file from your library to generate a custom haptic profile. The app uses advanced signal processing to "feel" the music, providing synchronized tactile feedback that matches the intensity and duration of detected transients.
+- **Advanced Controls**: Full playback control including Repeat (One/All), Next/Previous track, Playback Speed (0.5x to 2.0x), and a 1.5x Volume Boost.
 - **Automatic Analysis**: Missing a profile for a track? The app automatically queues it for background analysis as soon as it's selected.
 - **Live Profile Switching**: Switch between Bass, Drum, Guitar, and Amplitude profiles seamlessly during playback. The haptics update instantly to match the new profile.
 - **Sync Offset Adjustment**: Precision-tune the timing between audio and haptics to account for different hardware latencies.
+- **Seamless Track Changes**: Selecting a new track now automatically stops the old one and resets the UI, ensuring a clean and predictable transition.
 
 ### Multi-Layer Audio Visualizer
 A high-resolution, 32-band frequency visualizer available in-app and via persistent notification. It supports independent, overlapping layers that can be toggled in settings:

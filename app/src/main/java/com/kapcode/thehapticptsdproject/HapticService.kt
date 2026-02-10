@@ -25,6 +25,16 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.combine
 import kotlin.math.sqrt
 
+/**
+ * A foreground service responsible for managing all background operations.
+ *
+ * This service handles:
+ * - Listening for sensor events (squeeze, shake) to trigger therapeutic modes.
+ * - Holding a `PARTIAL_WAKE_LOCK` to ensure operations continue when the screen is off.
+ * - Managing the persistent notification, which displays real-time state and media controls.
+ * - Receiving intents to control the `BeatDetector` (play, pause, skip, stop).
+ * - Collecting state from `HapticManager` and `BeatDetector` to keep the notification UI updated.
+ */
 class HapticService : Service(), SensorEventListener {
 
     private val squeezeDetector = SqueezeManager.detector

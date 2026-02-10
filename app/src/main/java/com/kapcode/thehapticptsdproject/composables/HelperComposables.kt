@@ -170,141 +170,143 @@ fun InPlayerHapticVisualizer(selectedProfile: BeatProfile? = null) {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun InPlayerAudioVisualizer(selectedProfile: BeatProfile? = null) {
+    val hState by HapticManager.state.collectAsState()
+    
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val containerWidth = maxWidth
+        val scaledWidth = containerWidth * SettingsManager.scaleAudioVisualizerX
+        val baseHeight = 120.dp
+        val scaledHeight = baseHeight * SettingsManager.scaleAudioVisualizerY
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // --- Audio Visualizer ---
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val containerWidth = maxWidth
-            val scaledWidth = containerWidth * SettingsManager.scaleAudioVisualizerX
-            val baseHeight = 120.dp
-            val scaledHeight = baseHeight * SettingsManager.scaleAudioVisualizerY
-            
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+        ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
+                    .width(scaledWidth)
+                    .height(scaledHeight)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                    .padding(8.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .width(scaledWidth)
-                        .height(scaledHeight)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.Black.copy(alpha = 0.4f))
-                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                        .padding(8.dp)
-                ) {
-                    val overallIntensity = if (hState.visualizerData.isNotEmpty()) hState.visualizerData.average().toFloat() else 0f
+                val overallIntensity = if (hState.visualizerData.isNotEmpty()) hState.visualizerData.average().toFloat() else 0f
 
-                    // 1. Waveform / Background Glow
-                    if (SettingsManager.isWaveformEnabled) {
-                        val animatedWaveAlpha by animateFloatAsState(
-                            targetValue = 0.05f + (overallIntensity * 0.4f),
-                            animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
-                            label = "waveAlpha"
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight(0.5f)
-                                .align(Alignment.Center)
-                                .alpha(animatedWaveAlpha)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(50))
-                        )
-                        
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(2.dp)
-                                .align(Alignment.Center)
-                                .alpha(0.3f + overallIntensity * 0.7f)
-                                .background(Color.White.copy(alpha = 0.5f))
-                        )
-                    }
+                // 1. Waveform / Background Glow
+                if (SettingsManager.isWaveformEnabled) {
+                    val animatedWaveAlpha by animateFloatAsState(
+                        targetValue = 0.05f + (overallIntensity * 0.4f),
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
+                        label = "waveAlpha"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.5f)
+                            .align(Alignment.Center)
+                            .alpha(animatedWaveAlpha)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(50))
+                    )
+                    
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(2.dp)
+                            .align(Alignment.Center)
+                            .alpha(0.3f + overallIntensity * 0.7f)
+                            .background(Color.White.copy(alpha = 0.5f))
+                    )
+                }
 
-                    // 2. Bars and Indicators
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        if (SettingsManager.isBarsEnabled) {
-                            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                                // The Bars
-                                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                                    // Threshold Lines Background
-                                    Row(
-                                        modifier = Modifier.fillMaxSize(),
-                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                    ) {
-                                        repeat(32) { index ->
-                                            val thresholds = getThresholdsForIndex(index)
-                                            val threshold = thresholds.first
-                                            val triggerThreshold = thresholds.second
-                                            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                                                if (threshold != null) {
-                                                    Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(threshold).align(Alignment.BottomCenter).border(0.5.dp, Color.White.copy(alpha = 0.1f)))
-                                                    if (triggerThreshold != null) {
-                                                        Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(triggerThreshold).align(Alignment.BottomCenter).border(0.5.dp, Color.Red.copy(alpha = 0.2f)))
-                                                    }
+                // 2. Bars and Indicators
+                Row(modifier = Modifier.fillMaxSize()) {
+                    if (SettingsManager.isBarsEnabled) {
+                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            // The Bars
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                // Threshold Lines Background
+                                Row(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    repeat(32) { index ->
+                                        val thresholds = getThresholdsForIndex(index)
+                                        val threshold = thresholds.first
+                                        val triggerThreshold = thresholds.second
+                                        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                                            if (threshold != null) {
+                                                Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(threshold).align(Alignment.BottomCenter).border(0.5.dp, Color.White.copy(alpha = 0.1f)))
+                                                if (triggerThreshold != null) {
+                                                    Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(triggerThreshold).align(Alignment.BottomCenter).border(0.5.dp, Color.Red.copy(alpha = 0.2f)))
                                                 }
                                             }
                                         }
                                     }
-                                    
-                                    // Live Bars
-                                    Row(
-                                        modifier = Modifier.fillMaxSize(),
-                                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                        verticalAlignment = Alignment.Bottom
-                                    ) {
-                                        hState.visualizerData.forEachIndexed { index, intensity ->
-                                            val profile = getProfileForIndex(index)
-                                            val thresholds = getThresholdsForIndex(index)
-                                            val threshold = thresholds.first ?: 1.0f
-                                            val isAboveThreshold = intensity > threshold
-                                            val baseColor = profile?.getColor() ?: MaterialTheme.colorScheme.primary
-                                            
-                                            // Dim the bar if NOT triggered, or if trigger dimming is on.
-                                            val displayAlpha = if (isAboveThreshold) 1.0f else SettingsManager.visualizerTriggeredAlpha.coerceAtLeast(0.3f)
-                                            
-                                            VisualizerBar(
-                                                intensity = intensity,
-                                                color = baseColor,
-                                                alpha = displayAlpha,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                        }
+                                }
+                                
+                                // Live Bars
+                                Row(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                    verticalAlignment = Alignment.Bottom
+                                ) {
+                                    hState.visualizerData.forEachIndexed { index, intensity ->
+                                        val profile = getProfileForIndex(index)
+                                        val thresholds = getThresholdsForIndex(index)
+                                        val threshold = thresholds.first ?: 1.0f
+                                        val isAboveThreshold = intensity > threshold
+                                        val baseColor = profile?.getColor() ?: MaterialTheme.colorScheme.primary
+                                        
+                                        // Dim the bar if NOT triggered, or if trigger dimming is on.
+                                        val displayAlpha = if (isAboveThreshold) 1.0f else SettingsManager.visualizerTriggeredAlpha.coerceAtLeast(0.3f)
+                                        
+                                        VisualizerBar(
+                                            intensity = intensity,
+                                            color = baseColor,
+                                            alpha = displayAlpha,
+                                            modifier = Modifier.weight(1f)
+                                        )
                                     }
                                 }
-                                
-                                // Bottom Icon Indicators
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().height(24.dp).padding(top = 4.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    val data = hState.visualizerData
-                                    val isAmplitudeTriggered = data.getOrNull(0)?.let { it > SettingsManager.triggerThresholdAmplitude } ?: false
-                                    val isBassTriggered = data.size > 2 && (data[1] > SettingsManager.triggerThresholdBass || data[2] > SettingsManager.triggerThresholdBass)
-                                    val isDrumTriggered = data.size > 5 && (data[3] > SettingsManager.triggerThresholdDrum || data[4] > SettingsManager.triggerThresholdDrum || data[5] > SettingsManager.triggerThresholdDrum)
-                                    val isGuitarTriggered = data.size > 12 && (6..12).any { data[it] > SettingsManager.triggerThresholdGuitar }
+                            }
+                            
+                            // Bottom Icon Indicators
+                            Row(
+                                modifier = Modifier.fillMaxWidth().height(24.dp).padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                val data = hState.visualizerData
+                                val isAmplitudeTriggered = data.getOrNull(0)?.let { it > SettingsManager.triggerThresholdAmplitude } ?: false
+                                val isBassTriggered = data.size > 2 && (data[1] > SettingsManager.triggerThresholdBass || data[2] > SettingsManager.triggerThresholdBass)
+                                val isDrumTriggered = data.size > 5 && (data[3] > SettingsManager.triggerThresholdDrum || data[4] > SettingsManager.triggerThresholdDrum || data[5] > SettingsManager.triggerThresholdDrum)
+                                val isGuitarTriggered = data.size > 12 && (6..12).any { data[it] > SettingsManager.triggerThresholdGuitar }
 
-                                    ProfileIndicatorIcon(BeatProfile.AMPLITUDE, isAmplitudeTriggered, selectedProfile == BeatProfile.AMPLITUDE, Modifier.weight(1f))
-                                    ProfileIndicatorIcon(BeatProfile.BASS, isBassTriggered, selectedProfile == BeatProfile.BASS, Modifier.weight(2f))
-                                    ProfileIndicatorIcon(BeatProfile.DRUM, isDrumTriggered, selectedProfile == BeatProfile.DRUM, Modifier.weight(3f))
-                                    ProfileIndicatorIcon(BeatProfile.GUITAR, isGuitarTriggered, selectedProfile == BeatProfile.GUITAR, Modifier.weight(7f))
-                                    Spacer(modifier = Modifier.weight(19f))
-                                }
+                                ProfileIndicatorIcon(BeatProfile.AMPLITUDE, isAmplitudeTriggered, selectedProfile == BeatProfile.AMPLITUDE, Modifier.weight(1f))
+                                ProfileIndicatorIcon(BeatProfile.BASS, isBassTriggered, selectedProfile == BeatProfile.BASS, Modifier.weight(2f))
+                                ProfileIndicatorIcon(BeatProfile.DRUM, isDrumTriggered, selectedProfile == BeatProfile.DRUM, Modifier.weight(3f))
+                                ProfileIndicatorIcon(BeatProfile.GUITAR, isGuitarTriggered, selectedProfile == BeatProfile.GUITAR, Modifier.weight(7f))
+                                Spacer(modifier = Modifier.weight(19f))
                             }
                         }
+                    }
 
-                        if (SettingsManager.isChannelIntensityEnabled) {
-                            Column(
-                                modifier = Modifier.width(if (SettingsManager.isBarsEnabled) 80.dp else 240.dp).fillMaxHeight().padding(start = 8.dp),
-                                verticalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                val leftIntensity = if (hState.visualizerData.isNotEmpty()) hState.visualizerData[0] else 0f
-                                val rightIntensity = if (hState.visualizerData.size > 1) hState.visualizerData[1] else leftIntensity
-                                
-                                VisualizerProgressBar("LEFT", leftIntensity)
-                                VisualizerProgressBar("RIGHT", rightIntensity)
-                            }
+                    if (SettingsManager.isChannelIntensityEnabled) {
+                        Column(
+                            modifier = Modifier.width(if (SettingsManager.isBarsEnabled) 80.dp else 240.dp).fillMaxHeight().padding(start = 8.dp),
+                            verticalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            val leftIntensity = if (hState.visualizerData.isNotEmpty()) hState.visualizerData[0] else 0f
+                            val rightIntensity = if (hState.visualizerData.size > 1) hState.visualizerData[1] else leftIntensity
+                            
+                            VisualizerProgressBar("LEFT", leftIntensity)
+                            VisualizerProgressBar("RIGHT", rightIntensity)
                         }
                     }
                 }

@@ -12,6 +12,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * ViewModel for the BeatPlayerCard composable.
+ *
+ * This class manages the UI state and business logic for the Bilateral Beat Player feature.
+ * It interacts with the `BeatDetector` singleton to control playback, load audio files,
+ * manage haptic profiles, and trigger audio analysis. It also handles user interactions
+ * from the UI, such as track selection, playback controls, and profile changes.
+ */
 class BeatPlayerViewModel : ViewModel() {
     val playerState = BeatDetector.playerState
     val selectedProfile = mutableStateOf(BeatProfile.AMPLITUDE)
@@ -23,6 +31,17 @@ class BeatPlayerViewModel : ViewModel() {
 
     val lastLoadedUri = mutableStateOf<Uri?>(null)
     val lastLoadedProfile = mutableStateOf<BeatProfile?>(null)
+
+    val triggerNext = mutableStateOf(false)
+    private var pendingPlay = false
+
+    init {
+        BeatDetector.onTrackFinished = {
+            if (SettingsManager.isRepeatAllEnabled) {
+                triggerNext.value = true
+            }
+        }
+    }
 
     fun onFolderExpanded(uri: Uri) {
         expandedFolderUri.value = if (expandedFolderUri.value == uri) null else uri
@@ -42,6 +61,9 @@ class BeatPlayerViewModel : ViewModel() {
     }
 
     fun onFileSelected(uri: Uri, name: String) {
+        // If a track was playing or paused, set pendingPlay to continue playback after loading the new track.
+        pendingPlay = playerState.value.isPlaying || playerState.value.isPaused
+        lastLoadedUri.value = null
         BeatDetector.updateSelectedTrack(uri, name)
     }
 
@@ -95,10 +117,16 @@ class BeatPlayerViewModel : ViewModel() {
         if (uri != null && (uri != lastLoadedUri.value || profile != lastLoadedProfile.value)) {
             val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
             if (rootUri != null) {
-                // Load merged profiles for all 4 profiles if they exist
+                // This replaces the old beats, it does not add to them.
                 BeatDetector.loadMergedProfiles(context, uri, playerState.value.selectedFileName, rootUri)
                 
-                // Check if the current selected profile is missing
+                if (pendingPlay) {
+                    pendingPlay = false
+                    if (playerState.value.detectedBeats.isNotEmpty()) {
+                        play(context)
+                    }
+                }
+
                 val existingProfileUri = BeatDetector.findExistingProfile(context, rootUri, playerState.value.selectedFileName, profile)
                 if (existingProfileUri == null) {
                     Toast.makeText(context, "No haptic profile for ${profile.name}. Queuing analysis...", Toast.LENGTH_SHORT).show()
@@ -116,12 +144,10 @@ class BeatPlayerViewModel : ViewModel() {
 
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                // 1. Try last played
                 val lastUriStr = SettingsManager.lastPlayedAudioUri
                 val lastName = SettingsManager.lastPlayedAudioName
                 if (lastUriStr != null && lastName != null) {
                     val lastUri = Uri.parse(lastUriStr)
-                    // Check if it belongs to an authorized folder
                     val root = folderUris.find { lastUriStr.startsWith(it) }
                     if (root != null) {
                         onFileSelected(lastUri, lastName)
@@ -129,29 +155,19 @@ class BeatPlayerViewModel : ViewModel() {
                     }
                 }
 
-                // 2. Look for analyzed files, prefer shortest, then alphabetical
                 var bestFile: AnalysisFile? = null
-                var bestFolderUri: Uri? = null
-
                 for (folderUriStr in folderUris) {
                     val folderUri = Uri.parse(folderUriStr)
                     val files = getAudioFilesWithDetails(context, folderUri)
-                    
                     val analyzedFiles = files.filter { file ->
                         BeatDetector.findExistingProfile(context, folderUri, file.name, selectedProfile.value) != null
                     }
 
                     if (analyzedFiles.isNotEmpty()) {
-                        // Sort by duration (shortest first), then name
                         val sorted = analyzedFiles.sortedWith(compareBy({ it.durationMs }, { it.name }))
                         val top = sorted.first()
-                        
                         if (bestFile == null || top.durationMs < bestFile!!.durationMs) {
                             bestFile = top
-                            bestFolderUri = folderUri
-                        } else if (top.durationMs == bestFile!!.durationMs && top.name < bestFile!!.name) {
-                            bestFile = top
-                            bestFolderUri = folderUri
                         }
                     }
                 }
@@ -169,7 +185,6 @@ class BeatPlayerViewModel : ViewModel() {
             return
         }
 
-        // Ensure the service is running
         val intent = Intent(context, HapticService::class.java).apply {
             action = HapticService.ACTION_START
         }
@@ -184,19 +199,58 @@ class BeatPlayerViewModel : ViewModel() {
         }
     }
 
-    fun pause() {
-        BeatDetector.pausePlayback()
+    fun pause() = BeatDetector.pausePlayback()
+    fun stop() = BeatDetector.stopPlayback()
+    fun skipForward(seconds: Int) = BeatDetector.skipForward(seconds)
+    fun skipBackward(seconds: Int) = BeatDetector.skipBackward(seconds)
+
+    fun nextTrack(context: Context) {
+        viewModelScope.launch {
+            var files = filesInExpandedFolder.value
+            if (files.isEmpty()) {
+                val currentUri = playerState.value.selectedFileUri ?: return@launch
+                val rootUriStr = folderUris.firstOrNull { currentUri.toString().startsWith(it) }
+                if (rootUriStr != null) {
+                    val rootUri = Uri.parse(rootUriStr)
+                    files = withContext(Dispatchers.IO) { getAudioFiles(context, rootUri) }.sortedBy { it.first }
+                    filesInExpandedFolder.value = files
+                }
+            }
+            
+            if (files.isEmpty()) return@launch
+            
+            val currentUri = playerState.value.selectedFileUri
+            val currentIndex = files.indexOfFirst { it.second == currentUri }
+            val nextIndex = (currentIndex + 1) % files.size
+            val nextFile = files[nextIndex]
+            
+            // Set pendingPlay for repeat-all, as isPlaying will be false after the track completes.
+            if(SettingsManager.isRepeatAllEnabled) pendingPlay = true
+            onFileSelected(nextFile.second, nextFile.first)
+        }
     }
 
-    fun stop() {
-        BeatDetector.stopPlayback()
-    }
+    fun previousTrack(context: Context) {
+        viewModelScope.launch {
+            var files = filesInExpandedFolder.value
+            if (files.isEmpty()) {
+                val currentUri = playerState.value.selectedFileUri ?: return@launch
+                val rootUriStr = folderUris.firstOrNull { currentUri.toString().startsWith(it) }
+                if (rootUriStr != null) {
+                    val rootUri = Uri.parse(rootUriStr)
+                    files = withContext(Dispatchers.IO) { getAudioFiles(context, rootUri) }.sortedBy { it.first }
+                    filesInExpandedFolder.value = files
+                }
+            }
+            
+            if (files.isEmpty()) return@launch
+            
+            val currentUri = playerState.value.selectedFileUri
+            val currentIndex = files.indexOfFirst { it.second == currentUri }
+            val prevIndex = if (currentIndex <= 0) files.size - 1 else currentIndex - 1
+            val prevFile = files[prevIndex]
 
-    fun skipForward(seconds: Int) {
-        BeatDetector.skipForward(seconds)
-    }
-
-    fun skipBackward(seconds: Int) {
-        BeatDetector.skipBackward(seconds)
+            onFileSelected(prevFile.second, prevFile.first)
+        }
     }
 }

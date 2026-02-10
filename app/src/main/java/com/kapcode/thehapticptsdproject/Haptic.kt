@@ -8,6 +8,20 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/**
+ * Singleton object for managing haptic feedback and visualizer state.
+ *
+ * This manager is the central hub for all haptic-related operations. It is responsible for:
+ * - Maintaining the `HapticState`, which includes intensities, BPM, and visualizer data.
+ * - Running the "Heartbeat" therapeutic session via coroutines.
+ * - Playing discrete haptic pulses for testing or specific events.
+ * - Receiving beat triggers from `BeatDetector` and updating device visuals accordingly.
+ * - Dispatching vibration commands to the `HapticService`.
+ * - Managing a decay loop to gracefully fade out visualizer intensities for a smooth appearance.
+ * - This object does not directly interact with the `Vibrator` service; it delegates all
+ *   vibration commands to the `HapticService` to ensure they are executed correctly
+ *   within the service's lifecycle and wake lock context.
+ */
 data class HapticState(
     val intensity: Float = 0.5f,
     val bpm: Int = 60,

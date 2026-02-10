@@ -1,0 +1,13 @@
+# Folders
+.idea/
+.gradle/
+build/
+app/build/
+
+# Files
+*.apk
+*.aab
+local.properties
+/captures/
+*.nav
+*.saf

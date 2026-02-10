@@ -33,19 +33,21 @@ This document contains technical details, architectural decisions, and developme
 - **Mechanism**: Two-pass adaptive transient detection.
 - **Sync Logic**: Uses `currentPos - SettingsManager.hapticSyncOffsetMs` to allow precision alignment (±2000ms).
 - **Completion Logic**: Automatically resets playback state and UI controls upon track finish via `OnCompletionListener`.
+- **Advanced Controls**: Implemented Repeat (One/All), Playback Speed, and Volume Boost. State is managed in `SettingsManager` and applied via `syncPlaybackSettings()`.
+- **Track Switching**: `updateSelectedTrack` now stops previous playback to ensure a clean state transition.
 
 ### Visual Feedback & UI Components
 - **Dynamic Theming**: Real-time primary color transitions based on the active `BeatProfile`.
 - **Seekbar Ticks**: Dual-layer tick system showing upcoming haptic events with a "pre-cue shadow" for enhanced anticipation.
 - **Settings Drawer**: All configuration (Scaling, Gain, Snapping) is centralized in a `ModalNavigationDrawer`.
 
-## Recent Updates - Multi-Routing & UX Refinement
+## Recent Updates - Advanced Playback Controls
 
-- **Feature:** Implemented `DeviceAssignmentDialog` allowing users to map specific profiles (Bass, Drum, etc.) to specific devices (Phone, Left/Right Controllers).
-- **Feature:** Overhauled the sync slider range to ±2000ms with a -1500ms default.
-- **Fix:** Fixed visualizer width constraints ensuring full-card width coverage at 1.0x scaling.
-- **Fix:** Refined the "wobble" effect to be strictly tied to `activeProfiles` set in `HapticState`.
-- **Fix:** Implemented automatic Play/Pause reset upon track completion.
+- **Feature:** Implemented a three-state repeat button: Off, Repeat All, and Repeat One.
+- **Feature:** Added playback speed control (0.5x to 2.0x) and a 1.5x volume boost.
+- **Feature:** Implemented `nextTrack` and `previousTrack` functionality.
+- **Fix:** Corrected an issue where changing tracks did not stop the previous audio, leading to overlapping playback and inconsistent UI updates. `updateSelectedTrack` now calls `stopPlayback()` to ensure a clean state.
+- **Fix:** Fixed a build error related to a type mismatch (`Int` vs. `Long`) in the `seekTo` call within the `MediaPlayer.onCompletion` listener.
 
 ## Future Features & Ideas
 

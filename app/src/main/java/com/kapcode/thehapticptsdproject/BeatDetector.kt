@@ -28,6 +28,16 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.abs
 import kotlin.math.sqrt
 
+/**
+ * Core singleton for managing audio playback, haptic profile analysis, and synchronization.
+ *
+ * This object is responsible for:
+ * - Decoding audio files to analyze for rhythmic transients (beats).
+ * - Generating and saving `.haptic.json` profiles based on different algorithms (e.g., AMPLITUDE, BASS).
+ * - Managing the `MediaPlayer` instance for audio playback.
+ * - Exposing a `StateFlow` of the `BeatPlayerState` for UI observation.
+ * - Triggering haptic events in sync with audio playback by coordinating with `HapticManager`.
+ */
 enum class BeatProfile {
     AMPLITUDE, DRUM, BASS, GUITAR
 }
@@ -86,6 +96,8 @@ object BeatDetector {
     private var analysisJob: Job? = null
     private val analysisLock = AtomicBoolean(false)
     
+    var onTrackFinished: (() -> Unit)? = null
+    
     private const val ENERGY_HISTORY_SIZE = 43
 
     fun init() {
@@ -103,16 +115,32 @@ object BeatDetector {
     fun updateMediaVolume(volume: Float) {
         val coercedVolume = volume.coerceIn(0f, 1f)
         _playerState.update { it.copy(mediaVolume = coercedVolume) }
-        mediaPlayer?.setVolume(coercedVolume, coercedVolume)
+        syncPlaybackSettings()
         SettingsManager.mediaVolume = coercedVolume
     }
 
+    fun syncPlaybackSettings() {
+        mediaPlayer?.let { mp ->
+            val vol = (_playerState.value.mediaVolume * SettingsManager.volumeBoost).coerceIn(0f, 1f)
+            mp.setVolume(vol, vol)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                try {
+                    val params = mp.playbackParams
+                    params.speed = SettingsManager.playbackSpeed
+                    mp.playbackParams = params
+                } catch (e: Exception) { }
+            }
+        }
+    }
+
     fun updateSelectedTrack(uri: Uri?, name: String) {
+        stopPlayback()
         _playerState.update { it.copy(
             selectedFileUri = uri,
             selectedFileName = name,
-            detectedBeats = emptyList(),
-            nextBeatIndex = 0
+            nextBeatIndex = 0,
+            currentTimestampMs = 0,
+            totalDurationMs = 0
         ) }
     }
 
@@ -162,7 +190,7 @@ object BeatDetector {
         _playerState.update { state ->
             state.copy(
                 detectedBeats = sortedBeats,
-                nextBeatIndex = findNextBeatIndex(sortedBeats, state.currentTimestampMs)
+                nextBeatIndex = findNextBeatIndex(sortedBeats, state.currentTimestampMs - SettingsManager.hapticSyncOffsetMs)
             )
         }
     }
@@ -310,23 +338,30 @@ object BeatDetector {
                     .build()
             )
             setOnCompletionListener {
-                _playerState.update { it.copy(isPlaying = false, isPaused = false, currentTimestampMs = 0, nextBeatIndex = 0) }
-                visualizer?.enabled = false
-                HapticManager.resetIconAlphas()
+                if (SettingsManager.isRepeatEnabled) {
+                    seekTo(0L)
+                    start()
+                } else {
+                    _playerState.update { it.copy(isPlaying = false, isPaused = false, currentTimestampMs = 0, nextBeatIndex = 0) }
+                    visualizer?.enabled = false
+                    HapticManager.resetIconAlphas()
+                    onTrackFinished?.invoke()
+                }
             }
             prepare()
-            val volume = _playerState.value.mediaVolume
-            setVolume(volume, volume)
+            syncPlaybackSettings()
             setupVisualizer(audioSessionId)
             start()
         }
 
-        _playerState.update { it.copy(
-            isPlaying = true,
-            isPaused = false,
-            totalDurationMs = mediaPlayer?.duration?.toLong() ?: 0L,
-            nextBeatIndex = findNextBeatIndex(_playerState.value.detectedBeats, 0)
-        ) }
+        _playerState.update { state ->
+            state.copy(
+                isPlaying = true,
+                isPaused = false,
+                totalDurationMs = mediaPlayer?.duration?.toLong() ?: 0L,
+                nextBeatIndex = findNextBeatIndex(_playerState.value.detectedBeats, 0L - SettingsManager.hapticSyncOffsetMs)
+            )
+        }
 
         startPlaybackJob()
     }
@@ -438,6 +473,7 @@ object BeatDetector {
 
     fun resumePlayback() {
         mediaPlayer?.start()
+        syncPlaybackSettings()
         visualizer?.enabled = true
         _playerState.update { state ->
             state.copy(
@@ -483,10 +519,10 @@ object BeatDetector {
     fun stopPlayback() {
         playbackJob?.cancel()
         visualizer?.enabled = false
-        visualizer?.release()
+        try { visualizer?.release() } catch (e: Exception) {}
         visualizer = null
-        mediaPlayer?.stop()
-        mediaPlayer?.release()
+        try { mediaPlayer?.stop() } catch (e: Exception) {}
+        try { mediaPlayer?.release() } catch (e: Exception) {}
         mediaPlayer = null
         HapticManager.resetIconAlphas()
         _playerState.update { it.copy(isPlaying = false, isPaused = false, currentTimestampMs = 0, nextBeatIndex = 0) }

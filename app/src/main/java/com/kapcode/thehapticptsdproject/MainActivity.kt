@@ -159,6 +159,66 @@ fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel) {
                     Text("Settings", style = MaterialTheme.typography.headlineSmall)
                     Spacer(Modifier.height(16.dp))
 
+                    SectionCard(title = "Player Settings") {
+                        Column {
+                            Text("Seekbar Time Window: ${SettingsManager.seekbarTimeWindowMinutes}m", style = MaterialTheme.typography.bodySmall)
+                            Slider(
+                                value = SettingsManager.seekbarTimeWindowMinutes.toFloat(),
+                                onValueChange = { 
+                                    SettingsManager.seekbarTimeWindowMinutes = it.toInt()
+                                    SettingsManager.save()
+                                },
+                                valueRange = 1f..60f,
+                                steps = 59
+                            )
+                            
+                            Spacer(Modifier.height(16.dp))
+                            Text("Seek Thumb Customization", style = MaterialTheme.typography.titleMedium)
+                            Text("Width: ${SettingsManager.seekThumbWidth.toInt()}dp", style = MaterialTheme.typography.bodySmall)
+                            Slider(
+                                value = SettingsManager.seekThumbWidth,
+                                onValueChange = { SettingsManager.seekThumbWidth = it; SettingsManager.save() },
+                                valueRange = 2f..40f
+                            )
+                            Text("Height: ${SettingsManager.seekThumbHeight.toInt()}dp", style = MaterialTheme.typography.bodySmall)
+                            Slider(
+                                value = SettingsManager.seekThumbHeight,
+                                onValueChange = { SettingsManager.seekThumbHeight = it; SettingsManager.save() },
+                                valueRange = 10f..100f
+                            )
+                            Text("Alpha: ${(SettingsManager.seekThumbAlpha * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
+                            Slider(
+                                value = SettingsManager.seekThumbAlpha,
+                                onValueChange = { 
+                                    val newAlpha = it.coerceAtLeast(0.40f)
+                                    SettingsManager.seekThumbAlpha = newAlpha
+                                    SettingsManager.save()
+                                },
+                                valueRange = 0.40f..1f
+                            )
+
+                            Spacer(Modifier.height(8.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { SettingsManager.showOffsetSlider = !SettingsManager.showOffsetSlider; SettingsManager.save() }) {
+                                Checkbox(checked = SettingsManager.showOffsetSlider, onCheckedChange = { SettingsManager.showOffsetSlider = it; SettingsManager.save() })
+                                Text("Show offset slider in player")
+                            }
+
+                            Spacer(Modifier.height(4.dp))
+                            Text("Offset: ${SettingsManager.hapticSyncOffsetMs}ms", style = MaterialTheme.typography.bodyMedium)
+                            SliderWithTick(
+                                value = SettingsManager.hapticSyncOffsetMs.toFloat(),
+                                onValueChange = { 
+                                    SettingsManager.hapticSyncOffsetMs = applySnap(it, SettingsManager.snapSyncOffset).toInt()
+                                    SettingsManager.save()
+                                },
+                                valueRange = -2000f..2000f,
+                                defaultValue = -1500f
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
                     SectionCard(title = "Visualizer Customization") {
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { SettingsManager.isBarsEnabled = !SettingsManager.isBarsEnabled; SettingsManager.save() }) {
@@ -211,25 +271,6 @@ fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel) {
                                 Checkbox(checked = SettingsManager.invertVisualizerAlpha, onCheckedChange = { SettingsManager.invertVisualizerAlpha = it; SettingsManager.save() })
                                 Text("Invert Icon Alpha (Bright when triggered)")
                             }
-
-                            Spacer(Modifier.height(16.dp))
-                            Text("Haptic/Audio Sync (Offset)", style = MaterialTheme.typography.titleMedium)
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { SettingsManager.showOffsetSlider = !SettingsManager.showOffsetSlider; SettingsManager.save() }) {
-                                Checkbox(checked = SettingsManager.showOffsetSlider, onCheckedChange = { SettingsManager.showOffsetSlider = it; SettingsManager.save() })
-                                Text("Show offset slider in player")
-                            }
-
-                            Spacer(Modifier.height(4.dp))
-                            Text("Offset: ${SettingsManager.hapticSyncOffsetMs}ms", style = MaterialTheme.typography.bodyMedium)
-                            SliderWithTick(
-                                value = SettingsManager.hapticSyncOffsetMs.toFloat(),
-                                onValueChange = { 
-                                    SettingsManager.hapticSyncOffsetMs = applySnap(it, SettingsManager.snapSyncOffset).toInt()
-                                    SettingsManager.save()
-                                },
-                                valueRange = -1000f..1000f,
-                                defaultValue = 60f
-                            )
                         }
                     }
 
