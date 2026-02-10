@@ -99,6 +99,9 @@ object BeatDetector {
     var onTrackFinished: (() -> Unit)? = null
     
     private const val ENERGY_HISTORY_SIZE = 43
+    private val lastTriggerTimes = mutableMapOf<BeatProfile, Long>()
+    private var lastLiveHapticTime: Long = 0
+    var liveHapticProfile: BeatProfile = BeatProfile.AMPLITUDE
 
     fun init() {
         _playerState.update { it.copy(
@@ -321,7 +324,9 @@ object BeatDetector {
 
     fun playSynchronized(context: Context) {
         val uri = _playerState.value.selectedFileUri ?: return
-        if (_playerState.value.detectedBeats.isEmpty()) return
+        if (!SettingsManager.isLiveHapticsEnabled && _playerState.value.detectedBeats.isEmpty()) {
+            return
+        }
 
         stopPlayback()
         HapticManager.stopHeartbeatSession()
@@ -384,48 +389,56 @@ object BeatDetector {
                     }
 
                     override fun onFftDataCapture(visualizer: Visualizer?, fft: ByteArray?, samplingRate: Int) {
-                        if (SettingsManager.isBarsEnabled || SettingsManager.isChannelIntensityEnabled) {
-                            fft?.let {
-                                val n = it.size / 2
-                                val magnitudes = FloatArray(n)
-                                for (i in 0 until n) {
-                                    val re = it[i * 2].toFloat()
-                                    val im = it[i * 2 + 1].toFloat()
-                                    magnitudes[i] = sqrt(re * re + im * im) / 128f
+                        if (fft == null) return
+                        
+                        // Always calculate bands for visualizer UI
+                        val n = fft.size / 2
+                        val magnitudes = FloatArray(n)
+                        for (i in 0 until n) {
+                            val re = fft[i * 2].toFloat()
+                            val im = fft[i * 2 + 1].toFloat()
+                            magnitudes[i] = sqrt(re * re + im * im) / 128f
+                        }
+                        
+                        val bands = FloatArray(32)
+                        var totalSum = 0f
+                        magnitudes.forEach { totalSum += it }
+                        bands[0] = (totalSum / n) * SettingsManager.gainAmplitude // Amplitude
+                        
+                        var sum = 0f
+                        for (j in 0 until 2) sum += magnitudes[1 + j]
+                        bands[1] = (sum / 2) * SettingsManager.gainBass // Bass
+                        
+                        sum = 0f
+                        for (j in 0 until 3) sum += magnitudes[6 + j]
+                        bands[2] = (sum / 3) * SettingsManager.gainDrum // Drum
+                        
+                        sum = 0f
+                        for (j in 0 until 4) sum += magnitudes[16 + j]
+                        bands[3] = (sum / 4) * SettingsManager.gainGuitar // Guitar
+
+                        HapticManager.updateVisualizer(bands)
+
+                        // Live haptic trigger logic
+                        if (SettingsManager.isLiveHapticsEnabled) {
+                            val currentTime = System.currentTimeMillis()
+                            if (currentTime - lastLiveHapticTime < 100) return // Global cooldown
+
+                            val masterIntensity = _playerState.value.masterIntensity
+                            
+                            when (liveHapticProfile) {
+                                BeatProfile.AMPLITUDE -> if (bands[0] > SettingsManager.triggerThresholdAmplitude) {
+                                    triggerLiveHaptic(BeatProfile.AMPLITUDE, bands[0], masterIntensity)
                                 }
-                                val bands = FloatArray(32)
-                                var totalSum = 0f
-                                magnitudes.forEach { totalSum += it }
-                                bands[0] = (totalSum / n) * SettingsManager.gainAmplitude
-                                for (i in 1..2) {
-                                    val startBin = 1 + (i - 1) * 2
-                                    var sum = 0f
-                                    for (j in 0 until 2) sum += magnitudes[startBin + j]
-                                    bands[i] = (sum / 2) * SettingsManager.gainBass
+                                BeatProfile.BASS -> if (bands[1] > SettingsManager.triggerThresholdBass) {
+                                    triggerLiveHaptic(BeatProfile.BASS, bands[1], masterIntensity)
                                 }
-                                for (i in 3..5) {
-                                    val startBin = 6 + (i - 3) * 3
-                                    var sum = 0f
-                                    for (j in 0 until 3) sum += magnitudes[startBin + j]
-                                    bands[i] = (sum / 3) * SettingsManager.gainDrum
+                                BeatProfile.DRUM -> if (bands[2] > SettingsManager.triggerThresholdDrum) {
+                                    triggerLiveHaptic(BeatProfile.DRUM, bands[2], masterIntensity)
                                 }
-                                for (i in 6..12) {
-                                    val startBin = 16 + (i - 6) * 4
-                                    var sum = 0f
-                                    for (j in 0 until 4) sum += magnitudes[startBin + j]
-                                    bands[i] = (sum / 4) * SettingsManager.gainGuitar
+                                BeatProfile.GUITAR -> if (bands[3] > SettingsManager.triggerThresholdGuitar) {
+                                    triggerLiveHaptic(BeatProfile.GUITAR, bands[3], masterIntensity)
                                 }
-                                val remainingBins = n - 41
-                                val bandSizeHigh = (remainingBins / 19).coerceAtLeast(1)
-                                for (i in 13..31) {
-                                    val startBin = 41 + (i - 13) * bandSizeHigh
-                                    var sum = 0f
-                                    for (j in 0 until bandSizeHigh) {
-                                        if (startBin + j < n) sum += magnitudes[startBin + j]
-                                    }
-                                    bands[i] = (sum / bandSizeHigh) * SettingsManager.gainHighs
-                                }
-                                HapticManager.updateVisualizer(bands)
                             }
                         }
                     }
@@ -434,8 +447,42 @@ object BeatDetector {
             }
         } catch (e: Exception) { }
     }
+    
+    private fun triggerLiveHaptic(profile: BeatProfile, intensity: Float, masterIntensity: Float) {
+        lastLiveHapticTime = System.currentTimeMillis()
+        val scaledIntensity = (intensity * masterIntensity).coerceIn(0f, 1f)
+        val duration = when (profile) {
+            BeatProfile.BASS -> 350L
+            BeatProfile.DRUM -> 120L
+            else -> 100L
+        }
+        
+        val assignedDevices = SettingsManager.deviceAssignments.filter { it.value.contains(profile) }.keys
+        
+        assignedDevices.forEach { device ->
+            HapticManager.updateDeviceVisuals(device, scaledIntensity, profile.getColor(), profile)
+            if (device == HapticDevice.PHONE_LEFT || device == HapticDevice.PHONE_RIGHT) {
+                HapticManager.playRawVibration(duration, (255 * scaledIntensity).toInt().coerceIn(1, 255))
+            }
+        }
+    }
 
     private fun startPlaybackJob() {
+        if (SettingsManager.isLiveHapticsEnabled) {
+            // In Live mode, haptics are driven by the Visualizer's FFT listener, not the pre-analyzed beats.
+            // We still need a job to update the current timestamp for the UI.
+            playbackJob?.cancel()
+            playbackJob = CoroutineScope(Dispatchers.Default).launch {
+                 while (isActive) {
+                    if (mediaPlayer?.isPlaying == true) {
+                        _playerState.update { it.copy(currentTimestampMs = mediaPlayer?.currentPosition?.toLong() ?: 0L) }
+                    }
+                    delay(50)
+                }
+            }
+            return
+        }
+
         playbackJob?.cancel()
         playbackJob = CoroutineScope(Dispatchers.Default).launch {
             while (isActive) {

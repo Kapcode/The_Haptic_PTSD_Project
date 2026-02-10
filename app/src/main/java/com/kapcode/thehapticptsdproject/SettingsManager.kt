@@ -45,6 +45,7 @@ object SettingsManager {
     var hapticSyncOffsetMs by mutableStateOf(-1500)
 
     // Beat Player Settings
+    var isLiveHapticsEnabled by mutableStateOf(false)
     var beatMaxIntensity by mutableStateOf(1.0f)
     var mediaVolume by mutableStateOf(1.0f)
     var lastPlayedAudioUri by mutableStateOf<String?>(null)
@@ -59,6 +60,12 @@ object SettingsManager {
     var isRepeatAllEnabled by mutableStateOf(false)
     var volumeBoost by mutableStateOf(1.0f)
     var playbackSpeed by mutableStateOf(1.0f)
+
+    // Live Haptic Settings
+    var liveCooldownAmplitudeMs by mutableStateOf(200)
+    var liveCooldownBassMs by mutableStateOf(400)
+    var liveCooldownDrumMs by mutableStateOf(150)
+    var liveCooldownGuitarMs by mutableStateOf(200)
 
     // Device Assignments: Device -> Set of Profiles
     var deviceAssignments by mutableStateOf<Map<HapticDevice, Set<BeatProfile>>>(
@@ -129,6 +136,8 @@ object SettingsManager {
         hapticLeadInMs = prefs.getInt("haptic_lead_in", 10)
         hapticLeadOutMs = prefs.getInt("haptic_lead_out", 10)
         hapticSyncOffsetMs = prefs.getInt("haptic_sync_offset", -1500)
+        
+        isLiveHapticsEnabled = prefs.getBoolean("is_live_haptics_enabled", false)
         beatMaxIntensity = prefs.getFloat("beat_max_intensity", 1.0f)
         mediaVolume = prefs.getFloat("media_volume", 1.0f)
         lastPlayedAudioUri = prefs.getString("last_played_audio_uri", null)
@@ -143,6 +152,11 @@ object SettingsManager {
         isRepeatAllEnabled = prefs.getBoolean("is_repeat_all_enabled", false)
         volumeBoost = prefs.getFloat("volume_boost", 1.0f)
         playbackSpeed = prefs.getFloat("playback_speed", 1.0f)
+        
+        liveCooldownAmplitudeMs = prefs.getInt("live_cooldown_amplitude", 200)
+        liveCooldownBassMs = prefs.getInt("live_cooldown_bass", 400)
+        liveCooldownDrumMs = prefs.getInt("live_cooldown_drum", 150)
+        liveCooldownGuitarMs = prefs.getInt("live_cooldown_guitar", 200)
 
         val assignmentsJson = prefs.getString("device_assignments", null)
         if (assignmentsJson != null) {
@@ -209,6 +223,8 @@ object SettingsManager {
             putInt("haptic_lead_in", hapticLeadInMs)
             putInt("haptic_lead_out", hapticLeadOutMs)
             putInt("haptic_sync_offset", hapticSyncOffsetMs)
+            
+            putBoolean("is_live_haptics_enabled", isLiveHapticsEnabled)
             putFloat("beat_max_intensity", beatMaxIntensity)
             putFloat("media_volume", mediaVolume)
             putString("last_played_audio_uri", lastPlayedAudioUri)
@@ -223,6 +239,11 @@ object SettingsManager {
             putBoolean("is_repeat_all_enabled", isRepeatAllEnabled)
             putFloat("volume_boost", volumeBoost)
             putFloat("playback_speed", playbackSpeed)
+            
+            putInt("live_cooldown_amplitude", liveCooldownAmplitudeMs)
+            putInt("live_cooldown_bass", liveCooldownBassMs)
+            putInt("live_cooldown_drum", liveCooldownDrumMs)
+            putInt("live_cooldown_guitar", liveCooldownGuitarMs)
 
             putString("device_assignments", Json.encodeToString(deviceAssignments))
 
@@ -282,6 +303,8 @@ object SettingsManager {
         hapticLeadInMs = 10
         hapticLeadOutMs = 10
         hapticSyncOffsetMs = -1500
+        
+        isLiveHapticsEnabled = false
         beatMaxIntensity = 1.0f
         mediaVolume = 1.0f
         showOffsetSlider = false
@@ -294,6 +317,11 @@ object SettingsManager {
         isRepeatAllEnabled = false
         volumeBoost = 1.0f
         playbackSpeed = 1.0f
+
+        liveCooldownAmplitudeMs = 200
+        liveCooldownBassMs = 400
+        liveCooldownDrumMs = 150
+        liveCooldownGuitarMs = 200
         
         deviceAssignments = HapticDevice.entries.associateWith { setOf(BeatProfile.AMPLITUDE) }
 

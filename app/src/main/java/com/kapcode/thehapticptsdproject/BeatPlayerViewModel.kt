@@ -69,6 +69,7 @@ class BeatPlayerViewModel : ViewModel() {
 
     fun onProfileSelected(profile: BeatProfile) {
         selectedProfile.value = profile
+        BeatDetector.liveHapticProfile = profile
     }
 
     fun onBatchAnalyzeClicked() {
@@ -180,7 +181,8 @@ class BeatPlayerViewModel : ViewModel() {
     }
 
     fun play(context: Context) {
-        if (playerState.value.detectedBeats.isEmpty()) {
+        // Allow playback in live mode without analysis
+        if (!SettingsManager.isLiveHapticsEnabled && playerState.value.detectedBeats.isEmpty()) {
             Toast.makeText(context, "Waiting for audio analysis to complete...", Toast.LENGTH_SHORT).show()
             return
         }

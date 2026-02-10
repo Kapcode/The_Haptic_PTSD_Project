@@ -159,6 +159,9 @@ fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel) {
                     Text("Settings", style = MaterialTheme.typography.headlineSmall)
                     Spacer(Modifier.height(16.dp))
 
+                    LiveHapticSettingsCard()
+                    Spacer(Modifier.height(16.dp))
+
                     SectionCard(title = "Player Settings") {
                         Column {
                             Text("Seekbar Time Window: ${SettingsManager.seekbarTimeWindowMinutes}m", style = MaterialTheme.typography.bodySmall)

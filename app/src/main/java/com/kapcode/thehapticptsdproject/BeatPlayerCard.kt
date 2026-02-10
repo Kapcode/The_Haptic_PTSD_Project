@@ -79,7 +79,9 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
     }
 
     LaunchedEffect(playerState.selectedFileUri, selectedProfile) {
-        vm.loadProfileForSelectedTrack(context)
+        if (!SettingsManager.isLiveHapticsEnabled) {
+            vm.loadProfileForSelectedTrack(context)
+        }
     }
 
     LaunchedEffect(triggerNext) {
@@ -177,6 +179,26 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                 }
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Analyzed", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.width(8.dp))
+                Switch(
+                    checked = SettingsManager.isLiveHapticsEnabled,
+                    onCheckedChange = {
+                        SettingsManager.isLiveHapticsEnabled = it
+                        SettingsManager.save()
+                    }
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Live", style = MaterialTheme.typography.labelMedium)
+            }
+
             if (playerState.isAnalyzing) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Column {
@@ -192,19 +214,22 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                         Text("Cancel Analysis")
                     }
                 }
-            } else if (playerState.detectedBeats.isEmpty()) {
+            }
+
+            // Show Analyze button ONLY if in Analyzed mode and no beats are loaded for the selected track.
+            if (playerState.selectedFileUri != null && playerState.detectedBeats.isEmpty() && !SettingsManager.isLiveHapticsEnabled && !playerState.isAnalyzing && !playerState.isPlaying && !playerState.isPaused) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = { vm.analyzeSelectedAudio(context) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = playerState.selectedFileUri != null && !playerState.isPlaying && !playerState.isPaused
+                    modifier = Modifier.fillMaxWidth()
                 ) { Text("Analyze Audio") }
             }
 
-            if (playerState.detectedBeats.isNotEmpty() || playerState.isPlaying || playerState.isPaused) {
+            // Show player controls once a file is selected.
+            if (playerState.selectedFileUri != null) {
                 Column {
                     componentOrder.forEach { type ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                             IconButton(onClick = { 
                                 Toast.makeText(context, "Tap the pulsing Drag Handle in the top corner to cycle layout order.", Toast.LENGTH_SHORT).show()
                             }) {
@@ -247,12 +272,14 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                                                     Canvas(modifier = Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 10.dp)) {
                                                         val canvasWidth = size.width
                                                         val totalDuration = playerState.totalDurationMs.toFloat().coerceAtLeast(1f)
-                                                        playerState.detectedBeats.forEach { beat ->
-                                                            if (beat.profile in assignedProfiles) {
-                                                                val x = (beat.timestampMs.toFloat() / totalDuration) * canvasWidth
-                                                                val shadowWidth = 2.dp.toPx()
-                                                                drawLine(color = beat.profile.getColor().copy(alpha = 0.2f), start = androidx.compose.ui.geometry.Offset(x - shadowWidth, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = shadowWidth)
-                                                                drawLine(color = beat.profile.getColor().copy(alpha = 0.6f), start = androidx.compose.ui.geometry.Offset(x, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1.dp.toPx())
+                                                        if (!SettingsManager.isLiveHapticsEnabled) {
+                                                            playerState.detectedBeats.forEach { beat ->
+                                                                if (beat.profile in assignedProfiles) {
+                                                                    val x = (beat.timestampMs.toFloat() / totalDuration) * canvasWidth
+                                                                    val shadowWidth = 2.dp.toPx()
+                                                                    drawLine(color = beat.profile.getColor().copy(alpha = 0.2f), start = androidx.compose.ui.geometry.Offset(x - shadowWidth, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = shadowWidth)
+                                                                    drawLine(color = beat.profile.getColor().copy(alpha = 0.6f), start = androidx.compose.ui.geometry.Offset(x, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1.dp.toPx())
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -329,8 +356,8 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                                     }
                                 }
                             }
-                        }
-                        Spacer(Modifier.height(12.dp))
+                         }
+                         Spacer(Modifier.height(12.dp))
                     }
                 }
             }
