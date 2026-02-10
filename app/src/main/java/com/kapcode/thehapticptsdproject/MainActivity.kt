@@ -227,7 +227,7 @@ fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel) {
                                     SettingsManager.hapticSyncOffsetMs = applySnap(it, SettingsManager.snapSyncOffset).toInt()
                                     SettingsManager.save()
                                 },
-                                valueRange = -200f..200f,
+                                valueRange = -1000f..1000f,
                                 defaultValue = 60f
                             )
                         }

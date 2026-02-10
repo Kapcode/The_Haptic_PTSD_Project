@@ -95,19 +95,18 @@ class BeatPlayerViewModel : ViewModel() {
         if (uri != null && (uri != lastLoadedUri.value || profile != lastLoadedProfile.value)) {
             val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
             if (rootUri != null) {
+                // Load merged profiles for all 4 profiles if they exist
+                BeatDetector.loadMergedProfiles(context, uri, playerState.value.selectedFileName, rootUri)
+                
+                // Check if the current selected profile is missing
                 val existingProfileUri = BeatDetector.findExistingProfile(context, rootUri, playerState.value.selectedFileName, profile)
-                if (existingProfileUri != null) {
-                    BeatDetector.loadProfile(context, existingProfileUri)
-                    lastLoadedUri.value = uri
-                    lastLoadedProfile.value = profile
-                } else {
-                    // No profile found, notify and auto-queue analysis
+                if (existingProfileUri == null) {
                     Toast.makeText(context, "No haptic profile for ${profile.name}. Queuing analysis...", Toast.LENGTH_SHORT).show()
                     analyzeSelectedAudio(context)
-                    // Mark as "loaded" so we don't spam queue requests for the same combo
-                    lastLoadedUri.value = uri
-                    lastLoadedProfile.value = profile
                 }
+                
+                lastLoadedUri.value = uri
+                lastLoadedProfile.value = profile
             }
         }
     }

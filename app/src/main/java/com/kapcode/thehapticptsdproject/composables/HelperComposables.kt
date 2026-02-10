@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kapcode.thehapticptsdproject.BeatProfile
+import com.kapcode.thehapticptsdproject.HapticDevice
 import com.kapcode.thehapticptsdproject.HapticManager
 import com.kapcode.thehapticptsdproject.R
 import com.kapcode.thehapticptsdproject.SettingsManager
@@ -104,7 +106,7 @@ fun FolderItem(folderUri: android.net.Uri, isExpanded: Boolean, onClick: () -> U
         Text(folderUri.path?.substringAfterLast(':') ?: "Folder", modifier = Modifier
             .weight(1f)
             .padding(start = 16.dp))
-        Icon(if (isExpanded) Icons.Default.ArrowDropDown else Icons.Default.ArrowRight, null)
+        Icon(if (isExpanded) Icons.Default.ArrowDropDown else Icons.AutoMirrored.Filled.ArrowRight, null)
     }
 }
 
@@ -124,8 +126,20 @@ fun FileItem(name: String, isAnalyzed: Boolean, isSelected: Boolean, onClick: ()
 @Composable
 fun InPlayerHapticVisualizer(selectedProfile: BeatProfile? = null) {
     val hState by HapticManager.state.collectAsState()
+    var deviceToAssign by remember { mutableStateOf<HapticDevice?>(null) }
+
+    if (deviceToAssign != null) {
+        DeviceAssignmentDialog(
+            device = deviceToAssign!!,
+            onDismiss = { deviceToAssign = null }
+        )
+    }
     
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        // --- Device Assignment Row ---
+        Text("Tap device to assign profiles", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+        Spacer(Modifier.height(4.dp))
+        
         // --- Vibration Visualizer ---
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val containerWidth = maxWidth
@@ -147,12 +161,12 @@ fun InPlayerHapticVisualizer(selectedProfile: BeatProfile? = null) {
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    VisualizerIcon(R.drawable.phone_left_on, R.drawable.phone_left_off, hState.phoneLeftIntensity, "Phone L")
-                    VisualizerIcon(R.drawable.controller_left_on, R.drawable.controller_left_off, hState.controllerLeftTopIntensity, "Ctrl LT")
-                    VisualizerIcon(R.drawable.controller_left_on, R.drawable.controller_left_off, hState.controllerLeftBottomIntensity, "Ctrl LB")
-                    VisualizerIcon(R.drawable.controller_right_on, R.drawable.controller_right_off, hState.controllerRightTopIntensity, "Ctrl RT")
-                    VisualizerIcon(R.drawable.controller_right_on, R.drawable.controller_right_off, hState.controllerRightBottomIntensity, "Ctrl RB")
-                    VisualizerIcon(R.drawable.phone_right_on, R.drawable.phone_right_off, hState.phoneRightIntensity, "Phone R")
+                    VisualizerIcon(R.drawable.phone_left_on, R.drawable.phone_left_off, hState.phoneLeftIntensity, hState.phoneLeftColor, "Phone L", device = HapticDevice.PHONE_LEFT) { deviceToAssign = HapticDevice.PHONE_LEFT }
+                    VisualizerIcon(R.drawable.controller_left_on, R.drawable.controller_left_off, hState.controllerLeftTopIntensity, hState.controllerLeftTopColor, "Ctrl LT", device = HapticDevice.CTRL_LEFT_TOP) { deviceToAssign = HapticDevice.CTRL_LEFT_TOP }
+                    VisualizerIcon(R.drawable.controller_left_on, R.drawable.controller_left_off, hState.controllerLeftBottomIntensity, hState.controllerLeftBottomColor, "Ctrl LB", device = HapticDevice.CTRL_LEFT_BOTTOM) { deviceToAssign = HapticDevice.CTRL_LEFT_BOTTOM }
+                    VisualizerIcon(R.drawable.controller_right_on, R.drawable.controller_right_off, hState.controllerRightTopIntensity, hState.controllerRightTopColor, "Ctrl RT", device = HapticDevice.CTRL_RIGHT_TOP) { deviceToAssign = HapticDevice.CTRL_RIGHT_TOP }
+                    VisualizerIcon(R.drawable.controller_right_on, R.drawable.controller_right_off, hState.controllerRightBottomIntensity, hState.controllerRightBottomColor, "Ctrl RB", device = HapticDevice.CTRL_RIGHT_BOTTOM) { deviceToAssign = HapticDevice.CTRL_RIGHT_BOTTOM }
+                    VisualizerIcon(R.drawable.phone_right_on, R.drawable.phone_right_off, hState.phoneRightIntensity, hState.phoneRightColor, "Phone R", device = HapticDevice.PHONE_RIGHT) { deviceToAssign = HapticDevice.PHONE_RIGHT }
                 }
             }
         }
@@ -220,7 +234,9 @@ fun InPlayerHapticVisualizer(selectedProfile: BeatProfile? = null) {
                                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
                                         repeat(32) { index ->
-                                            val (threshold, triggerThreshold) = getThresholdsForIndex(index)
+                                            val thresholds = getThresholdsForIndex(index)
+                                            val threshold = thresholds.first
+                                            val triggerThreshold = thresholds.second
                                             Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                                                 if (threshold != null) {
                                                     Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(threshold).align(Alignment.BottomCenter).border(0.5.dp, Color.White.copy(alpha = 0.1f)))
@@ -240,7 +256,8 @@ fun InPlayerHapticVisualizer(selectedProfile: BeatProfile? = null) {
                                     ) {
                                         hState.visualizerData.forEachIndexed { index, intensity ->
                                             val profile = getProfileForIndex(index)
-                                            val threshold = getThresholdsForIndex(index).first ?: 1.0f
+                                            val thresholds = getThresholdsForIndex(index)
+                                            val threshold = thresholds.first ?: 1.0f
                                             val isAboveThreshold = intensity > threshold
                                             val baseColor = profile?.getColor() ?: MaterialTheme.colorScheme.primary
                                             
@@ -315,32 +332,40 @@ private fun getThresholdsForIndex(index: Int): Pair<Float?, Float?> = when {
 @Composable
 fun ProfileIndicatorIcon(profile: BeatProfile, isVisualizerTriggered: Boolean, isSelected: Boolean, modifier: Modifier = Modifier) {
     val hState by HapticManager.state.collectAsState()
-    val isHapticActive = hState.phoneLeftIntensity > 0.01f || hState.phoneRightIntensity > 0.01f
     
-    val isCurrentlyTriggered = isVisualizerTriggered || (isHapticActive && (isSelected || profile == BeatProfile.AMPLITUDE))
+    // STRICT HAPTIC EVENT CHECK: Only wobble if the profile is actively causing vibration
+    val isCurrentlyVibrating = profile in hState.activeProfiles
 
-    var latchTriggered by remember { mutableStateOf(false) }
-    LaunchedEffect(hState.resetCounter) { latchTriggered = false }
-
-    LaunchedEffect(isCurrentlyTriggered) {
-        if (isCurrentlyTriggered) {
-            latchTriggered = true
-            delay(SettingsManager.latchDurationMs.toLong())
-            latchTriggered = false
-        }
-    }
-
-    val displayTriggered = isCurrentlyTriggered || latchTriggered
-    val targetAlpha = if (displayTriggered) 1.0f else SettingsManager.minIconAlpha.coerceAtLeast(0.2f)
-    
+    val targetAlpha = if (isCurrentlyVibrating) 1.0f else SettingsManager.minIconAlpha.coerceAtLeast(0.2f)
     val animatedAlpha by animateFloatAsState(targetValue = targetAlpha, label = "iconAlpha")
+
+    // Wobble animation
+    val infiniteTransition = rememberInfiniteTransition(label = "wobble")
+    val wobbleAngle by infiniteTransition.animateFloat(
+        initialValue = -10f,
+        targetValue = 10f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(150, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "wobbleAngle"
+    )
 
     Box(modifier = modifier.fillMaxHeight().background(profile.getColor().copy(alpha = 0.05f), RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
         Icon(
             imageVector = profile.getIcon(),
             contentDescription = null,
             tint = profile.getColor(),
-            modifier = Modifier.size(16.dp).alpha(animatedAlpha)
+            modifier = Modifier
+                .size(16.dp)
+                .alpha(animatedAlpha)
+                .graphicsLayer {
+                    if (isCurrentlyVibrating) {
+                        rotationZ = wobbleAngle
+                        scaleX = 1.2f
+                        scaleY = 1.2f
+                    }
+                }
         )
         if (isSelected) {
             Box(Modifier.fillMaxSize().border(1.dp, profile.getColor().copy(alpha = 0.5f), RoundedCornerShape(4.dp)))
@@ -392,18 +417,46 @@ fun VisualizerProgressBar(label: String, intensity: Float) {
 }
 
 @Composable
-fun VisualizerIcon(onRes: Int, offRes: Int, intensity: Float, label: String, size: androidx.compose.ui.unit.Dp = 40.dp) {
+fun VisualizerIcon(onRes: Int, offRes: Int, intensity: Float, activeColor: Color, label: String, size: androidx.compose.ui.unit.Dp = 40.dp, device: HapticDevice? = null, onClick: () -> Unit) {
+    val hState by HapticManager.state.collectAsState()
     val animatedIntensity by animateFloatAsState(targetValue = intensity, label = "iconIntensity")
     val isActive = animatedIntensity > 0.01f
     val alpha = (SettingsManager.minIconAlpha + (animatedIntensity * (1.0f - SettingsManager.minIconAlpha))).coerceIn(0f, 1f)
     
     val themePrimary = MaterialTheme.colorScheme.primary
-    val color = if (isActive) themePrimary else Color.Gray
+    val color = if (isActive) activeColor else Color.Gray
     
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(60.dp)) {
+    // DEVICE WOBBLE Logic: Wobble if any profile assigned to this device is actively vibrating
+    val isDeviceVibrating = remember(hState.activeProfiles, device) {
+        if (device == null) false
+        else {
+            val assignedProfiles = SettingsManager.deviceAssignments[device] ?: emptySet()
+            assignedProfiles.any { it in hState.activeProfiles }
+        }
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "deviceWobble")
+    val wobbleAngle by infiniteTransition.animateFloat(
+        initialValue = -8f,
+        targetValue = 8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(120, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "deviceWobbleAngle"
+    )
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(60.dp).clickable { onClick() }) {
         Box(
             modifier = Modifier
                 .size(size)
+                .graphicsLayer {
+                    if (isDeviceVibrating) {
+                        rotationZ = wobbleAngle
+                        scaleX = 1.15f
+                        scaleY = 1.15f
+                    }
+                }
                 .clip(CircleShape)
                 .background(if (isActive) color.copy(alpha = 0.15f) else Color.Transparent)
                 .border(1.dp, color.copy(alpha = if (isActive) 0.5f else 0.2f), CircleShape),
@@ -419,4 +472,55 @@ fun VisualizerIcon(onRes: Int, offRes: Int, intensity: Float, label: String, siz
         }
         Text(label, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = color.copy(alpha = 0.8f), maxLines = 1)
     }
+}
+
+@Composable
+fun DeviceAssignmentDialog(device: HapticDevice, onDismiss: () -> Unit) {
+    var assignedProfiles by remember { mutableStateOf(SettingsManager.deviceAssignments[device] ?: emptySet()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Assign Profiles to ${device.label}") },
+        text = {
+            Column {
+                BeatProfile.entries.forEach { profile ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                assignedProfiles = if (profile in assignedProfiles) {
+                                    assignedProfiles - profile
+                                } else {
+                                    assignedProfiles + profile
+                                }
+                            }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(checked = profile in assignedProfiles, onCheckedChange = null)
+                        Spacer(Modifier.width(8.dp))
+                        Icon(profile.getIcon(), null, tint = profile.getColor())
+                        Spacer(Modifier.width(8.dp))
+                        Text(profile.name, color = profile.getColor())
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val currentAssignments = SettingsManager.deviceAssignments.toMutableMap()
+                currentAssignments[device] = assignedProfiles
+                SettingsManager.deviceAssignments = currentAssignments
+                SettingsManager.save()
+                onDismiss()
+            }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

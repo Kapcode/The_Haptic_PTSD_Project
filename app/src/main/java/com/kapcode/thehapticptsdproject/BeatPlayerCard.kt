@@ -2,6 +2,7 @@ package com.kapcode.thehapticptsdproject
 
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -203,12 +204,52 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                     val totalSecs = playerState.totalDurationMs / 1000
                     Text("${currentSecs / 60}:${(currentSecs % 60).toString().padStart(2, '0')} / ${totalSecs / 60}:${(totalSecs % 60).toString().padStart(2, '0')}", style = MaterialTheme.typography.bodySmall)
 
-                    Slider(
-                        value = playerState.currentTimestampMs.toFloat(),
-                        onValueChange = { BeatDetector.seekTo(it.toLong()) },
-                        valueRange = 0f..playerState.totalDurationMs.toFloat().coerceAtLeast(1f),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
+                        // Ticks Canvas
+                        val assignedProfiles = remember(SettingsManager.deviceAssignments) {
+                            SettingsManager.deviceAssignments.values.flatten().toSet()
+                        }
+                        
+                        Canvas(modifier = Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 20.dp)) {
+                            val width = size.width
+                            val totalDuration = playerState.totalDurationMs.toFloat().coerceAtLeast(1f)
+                            
+                            playerState.detectedBeats.forEach { beat ->
+                                if (beat.profile in assignedProfiles) {
+                                    val x = (beat.timestampMs.toFloat() / totalDuration) * width
+                                    
+                                    // Leading shadow tick (20% alpha, starting slightly sooner)
+                                    val shadowWidth = 2.dp.toPx()
+                                    drawLine(
+                                        color = beat.profile.getColor().copy(alpha = 0.2f),
+                                        start = androidx.compose.ui.geometry.Offset(x - shadowWidth, 0f),
+                                        end = androidx.compose.ui.geometry.Offset(x, size.height),
+                                        strokeWidth = shadowWidth
+                                    )
+                                    
+                                    // Main tick
+                                    drawLine(
+                                        color = beat.profile.getColor().copy(alpha = 0.6f),
+                                        start = androidx.compose.ui.geometry.Offset(x, 0f),
+                                        end = androidx.compose.ui.geometry.Offset(x, size.height),
+                                        strokeWidth = 1.dp.toPx()
+                                    )
+                                }
+                            }
+                        }
+
+                        Slider(
+                            value = playerState.currentTimestampMs.toFloat(),
+                            onValueChange = { BeatDetector.seekTo(it.toLong()) },
+                            valueRange = 0f..playerState.totalDurationMs.toFloat().coerceAtLeast(1f),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.primary,
+                                activeTrackColor = Color.Transparent,
+                                inactiveTrackColor = Color.Transparent
+                            )
+                        )
+                    }
                     
                     if (SettingsManager.showOffsetSlider) {
                         Text("Sync Offset: ${SettingsManager.hapticSyncOffsetMs}ms", style = MaterialTheme.typography.bodySmall)
@@ -218,8 +259,8 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                                 SettingsManager.hapticSyncOffsetMs = applySnap(it, SettingsManager.snapSyncOffset).toInt()
                                 SettingsManager.save()
                             },
-                            valueRange = -200f..200f,
-                            defaultValue = 60f,
+                            valueRange = -2000f..2000f,
+                            defaultValue = -1500f,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

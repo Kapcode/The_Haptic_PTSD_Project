@@ -5,11 +5,23 @@ import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 enum class VisualizerType {
     VERTICAL_BARS,
     CHANNEL_INTENSITY,
     WAVEFORM
+}
+
+enum class HapticDevice(val label: String) {
+    PHONE_LEFT("Phone L"),
+    PHONE_RIGHT("Phone R"),
+    CTRL_LEFT_TOP("Ctrl LT"),
+    CTRL_LEFT_BOTTOM("Ctrl LB"),
+    CTRL_RIGHT_TOP("Ctrl RT"),
+    CTRL_RIGHT_BOTTOM("Ctrl RB")
 }
 
 object SettingsManager {
@@ -30,7 +42,7 @@ object SettingsManager {
     var sessionDurationSeconds by mutableStateOf(120)
     var hapticLeadInMs by mutableStateOf(10)
     var hapticLeadOutMs by mutableStateOf(10)
-    var hapticSyncOffsetMs by mutableStateOf(60)
+    var hapticSyncOffsetMs by mutableStateOf(-1500)
 
     // Beat Player Settings
     var beatMaxIntensity by mutableStateOf(1.0f)
@@ -39,6 +51,10 @@ object SettingsManager {
     var lastPlayedAudioName by mutableStateOf<String?>(null)
     var showOffsetSlider by mutableStateOf(false)
 
+    // Device Assignments: Device -> Set of Profiles
+    var deviceAssignments by mutableStateOf<Map<HapticDevice, Set<BeatProfile>>>(
+        HapticDevice.entries.associateWith { setOf(BeatProfile.AMPLITUDE) }
+    )
 
     // Visualizer Settings (Independent Layers)
     var isBarsEnabled by mutableStateOf(true)
@@ -103,12 +119,21 @@ object SettingsManager {
         sessionDurationSeconds = prefs.getInt("haptic_session_duration", 120)
         hapticLeadInMs = prefs.getInt("haptic_lead_in", 10)
         hapticLeadOutMs = prefs.getInt("haptic_lead_out", 10)
-        hapticSyncOffsetMs = prefs.getInt("haptic_sync_offset", 60)
+        hapticSyncOffsetMs = prefs.getInt("haptic_sync_offset", -1500)
         beatMaxIntensity = prefs.getFloat("beat_max_intensity", 1.0f)
         mediaVolume = prefs.getFloat("media_volume", 1.0f)
         lastPlayedAudioUri = prefs.getString("last_played_audio_uri", null)
         lastPlayedAudioName = prefs.getString("last_played_audio_name", null)
         showOffsetSlider = prefs.getBoolean("show_offset_slider", false)
+
+        val assignmentsJson = prefs.getString("device_assignments", null)
+        if (assignmentsJson != null) {
+            try {
+                deviceAssignments = Json.decodeFromString(assignmentsJson)
+            } catch (e: Exception) {
+                // Fallback to default
+            }
+        }
 
         isBarsEnabled = prefs.getBoolean("is_bars_enabled", true)
         isChannelIntensityEnabled = prefs.getBoolean("is_channel_intensity_enabled", false)
@@ -172,6 +197,8 @@ object SettingsManager {
             putString("last_played_audio_name", lastPlayedAudioName)
             putBoolean("show_offset_slider", showOffsetSlider)
 
+            putString("device_assignments", Json.encodeToString(deviceAssignments))
+
             putBoolean("is_bars_enabled", isBarsEnabled)
             putBoolean("is_channel_intensity_enabled", isChannelIntensityEnabled)
             putBoolean("is_waveform_enabled", isWaveformEnabled)
@@ -227,11 +254,13 @@ object SettingsManager {
         sessionDurationSeconds = 120
         hapticLeadInMs = 10
         hapticLeadOutMs = 10
-        hapticSyncOffsetMs = 60
+        hapticSyncOffsetMs = -1500
         beatMaxIntensity = 1.0f
         mediaVolume = 1.0f
         showOffsetSlider = false
         
+        deviceAssignments = HapticDevice.entries.associateWith { setOf(BeatProfile.AMPLITUDE) }
+
         isBarsEnabled = true
         isChannelIntensityEnabled = false
         isWaveformEnabled = false

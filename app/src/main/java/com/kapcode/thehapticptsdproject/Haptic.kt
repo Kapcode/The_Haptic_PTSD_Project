@@ -2,6 +2,7 @@ package com.kapcode.thehapticptsdproject
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.ui.graphics.Color
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +28,17 @@ data class HapticState(
     val controllerLeftBottomIntensity: Float = 0f,
     val controllerRightTopIntensity: Float = 0f,
     val controllerRightBottomIntensity: Float = 0f,
+
+    // Live motor colors (Precedence based on most recent profile)
+    val phoneLeftColor: Color = Color.Cyan,
+    val phoneRightColor: Color = Color.Cyan,
+    val controllerLeftTopColor: Color = Color.Cyan,
+    val controllerLeftBottomColor: Color = Color.Cyan,
+    val controllerRightTopColor: Color = Color.Cyan,
+    val controllerRightBottomColor: Color = Color.Cyan,
+
+    // Currently vibrating profiles (for wobble animation)
+    val activeProfiles: Set<BeatProfile> = emptySet(),
 
     // Live visualizer data
     val visualizerData: FloatArray = FloatArray(32) { 0f },
@@ -63,15 +75,23 @@ object HapticManager {
                 delay(50)
                 val current = _state.value
                 
-                val hasMotorActivity = current.phoneLeftIntensity > 0 || current.phoneRightIntensity > 0 ||
-                    current.controllerLeftTopIntensity > 0 || current.controllerLeftBottomIntensity > 0 ||
-                    current.controllerRightTopIntensity > 0 || current.controllerRightBottomIntensity > 0
+                val phoneActive = current.phoneLeftIntensity > 0.05f || current.phoneRightIntensity > 0.05f
+                val controllersActive = current.controllerLeftTopIntensity > 0.05f || current.controllerLeftBottomIntensity > 0.05f ||
+                                       current.controllerRightTopIntensity > 0.05f || current.controllerRightBottomIntensity > 0.05f
                 
+                val anyMotorActive = phoneActive || controllersActive
                 val hasVisualizerActivity = current.visualizerData.any { it > 0f }
 
-                if (hasMotorActivity || hasVisualizerActivity) {
+                if (anyMotorActive || hasVisualizerActivity) {
                     val newVisualizerData = current.visualizerData.map { (it - 0.10f).coerceAtLeast(0f) }.toFloatArray()
                     
+                    // Clear active profiles if NO device is vibrating
+                    val newActiveProfiles = if (!anyMotorActive) {
+                        emptySet<BeatProfile>()
+                    } else {
+                        current.activeProfiles
+                    }
+
                     _state.value = current.copy(
                         phoneLeftIntensity = (current.phoneLeftIntensity - 0.15f).coerceAtLeast(0f),
                         phoneRightIntensity = (current.phoneRightIntensity - 0.15f).coerceAtLeast(0f),
@@ -79,8 +99,11 @@ object HapticManager {
                         controllerLeftBottomIntensity = (current.controllerLeftBottomIntensity - 0.15f).coerceAtLeast(0f),
                         controllerRightTopIntensity = (current.controllerRightTopIntensity - 0.15f).coerceAtLeast(0f),
                         controllerRightBottomIntensity = (current.controllerRightBottomIntensity - 0.15f).coerceAtLeast(0f),
-                        visualizerData = newVisualizerData
+                        visualizerData = newVisualizerData,
+                        activeProfiles = newActiveProfiles
                     )
+                } else if (current.activeProfiles.isNotEmpty()) {
+                    _state.value = current.copy(activeProfiles = emptySet())
                 }
             }
         }
@@ -120,7 +143,7 @@ object HapticManager {
     fun startHeartbeatSession() {
         val playerState = BeatDetector.playerState.value
         if (playerState.isPlaying || playerState.isPaused) {
-            return // Don't start heartbeat if BB Player is active
+            return 
         }
 
         if (_state.value.isHeartbeatRunning) {
@@ -186,12 +209,12 @@ object HapticManager {
         }
     }
     
-    fun playPulse(intensityOverride: Float? = null, durationMs: Long = 100L, channel: Int = 2) {
+    fun playPulse(intensityOverride: Float? = null, durationMs: Long = 100L, channel: Int = 2, profile: BeatProfile? = null) {
         val intensity = intensityOverride ?: _state.value.intensity
         val strength = (255 * intensity).toInt().coerceIn(1, 255)
         
         CoroutineScope(Dispatchers.Default).launch {
-            updateVisuals(intensity, channel)
+            updateVisuals(intensity, channel, profile)
             delay(state.value.leadInMs.toLong())
             playRawVibration(durationMs, strength)
             delay(durationMs)
@@ -199,12 +222,34 @@ object HapticManager {
         }
     }
 
-    private fun updateVisuals(intensity: Float, channel: Int) {
+    fun updateDeviceVisuals(device: HapticDevice, intensity: Float, color: Color, profile: BeatProfile) {
         val current = _state.value
+        val newActiveProfiles = current.activeProfiles + profile
+        _state.value = when (device) {
+            HapticDevice.PHONE_LEFT -> current.copy(phoneLeftIntensity = intensity, phoneLeftColor = color, activeProfiles = newActiveProfiles)
+            HapticDevice.PHONE_RIGHT -> current.copy(phoneRightIntensity = intensity, phoneRightColor = color, activeProfiles = newActiveProfiles)
+            HapticDevice.CTRL_LEFT_TOP -> current.copy(controllerLeftTopIntensity = intensity, controllerLeftTopColor = color, activeProfiles = newActiveProfiles)
+            HapticDevice.CTRL_LEFT_BOTTOM -> current.copy(controllerLeftBottomIntensity = intensity, controllerLeftBottomColor = color, activeProfiles = newActiveProfiles)
+            HapticDevice.CTRL_RIGHT_TOP -> current.copy(controllerRightTopIntensity = intensity, controllerRightTopColor = color, activeProfiles = newActiveProfiles)
+            HapticDevice.CTRL_RIGHT_BOTTOM -> current.copy(controllerRightBottomIntensity = intensity, controllerRightBottomColor = color, activeProfiles = newActiveProfiles)
+        }
+    }
+
+    private fun updateVisuals(intensity: Float, channel: Int, profile: BeatProfile?) {
+        val current = _state.value
+        val color = profile?.getColor() ?: Color.Cyan
+        val newActiveProfiles = if (profile != null) current.activeProfiles + profile else current.activeProfiles
+        
         _state.value = when (channel) {
-            0 -> current.copy(phoneLeftIntensity = intensity)
-            1 -> current.copy(phoneRightIntensity = intensity)
-            else -> current.copy(phoneLeftIntensity = intensity, phoneRightIntensity = intensity)
+            0 -> current.copy(phoneLeftIntensity = intensity, phoneLeftColor = color, activeProfiles = newActiveProfiles)
+            1 -> current.copy(phoneRightIntensity = intensity, phoneRightColor = color, activeProfiles = newActiveProfiles)
+            else -> current.copy(
+                phoneLeftIntensity = intensity, 
+                phoneRightIntensity = intensity,
+                phoneLeftColor = color,
+                phoneRightColor = color,
+                activeProfiles = newActiveProfiles
+            )
         }
     }
 
@@ -220,7 +265,7 @@ object HapticManager {
         val strength1 = (255 * intensity).toInt().coerceIn(1, 255)
         val strength2 = (180 * intensity).toInt().coerceIn(1, 255)
 
-        updateVisuals(intensity, 2)
+        updateVisuals(intensity, 2, BeatProfile.AMPLITUDE)
         delay(s.leadInMs.toLong())
         playRawVibration(50, strength1)
         delay(50)
@@ -228,7 +273,7 @@ object HapticManager {
         
         delay(80)
 
-        updateVisuals(intensity * 0.7f, 2)
+        updateVisuals(intensity * 0.7f, 2, BeatProfile.AMPLITUDE)
         delay(s.leadInMs.toLong())
         playRawVibration(60, strength2)
         delay(60)
@@ -250,7 +295,8 @@ object HapticManager {
     }
 
     fun resetIconAlphas() {
-        _state.value = _state.value.copy(
+        val current = _state.value
+        _state.value = current.copy(
             phoneLeftIntensity = 0f,
             phoneRightIntensity = 0f,
             controllerLeftTopIntensity = 0f,
@@ -258,7 +304,8 @@ object HapticManager {
             controllerRightTopIntensity = 0f,
             controllerRightBottomIntensity = 0f,
             visualizerData = FloatArray(32) { 0f },
-            resetCounter = _state.value.resetCounter + 1
+            activeProfiles = emptySet(),
+            resetCounter = current.resetCounter + 1
         )
     }
 

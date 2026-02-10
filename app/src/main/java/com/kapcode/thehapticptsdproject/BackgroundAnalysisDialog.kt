@@ -1,6 +1,7 @@
 package com.kapcode.thehapticptsdproject
 
 import android.net.Uri
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,46 +17,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun BackgroundAnalysisDialog(onDismiss: () -> Unit, onStart: (List<Triple<Uri, String, Uri>>, Set<BeatProfile>) -> Unit) {
+fun BackgroundAnalysisDialog(
+    vm: BackgroundAnalysisViewModel = viewModel(),
+    onDismiss: () -> Unit,
+    onStart: (List<Triple<Uri, String, Uri>>, Set<BeatProfile>) -> Unit
+) {
     val context = LocalContext.current
+    val activity = LocalActivity.current as? MainActivity
     val folderUris = SettingsManager.authorizedFolderUris
-    var allFiles by remember { mutableStateOf<List<AnalysisFile>>(emptyList()) }
-    var selectedFileUris by remember { mutableStateOf(setOf<Uri>()) }
-    var selectedProfiles by remember { mutableStateOf(BeatProfile.entries.toSet()) }
-    var isScanning by remember { mutableStateOf(true) }
-    var analyzedMap by remember { mutableStateOf<Map<Pair<Uri, BeatProfile>, Boolean>>(emptyMap()) }
-    
-    val activity = LocalContext.current as? MainActivity
 
     LaunchedEffect(folderUris) {
-        withContext(Dispatchers.IO) {
-            val files = mutableListOf<AnalysisFile>()
-            folderUris.forEach { uriString ->
-                val folderUri = Uri.parse(uriString)
-                files.addAll(getAudioFilesWithDetails(context, folderUri))
-            }
-            
-            val statusMap = mutableMapOf<Pair<Uri, BeatProfile>, Boolean>()
-            files.forEach { file ->
-                BeatProfile.entries.forEach { profile ->
-                    statusMap[file.uri to profile] = BeatDetector.findExistingProfile(context, file.parentUri, file.name, profile) != null
-                }
-            }
-            
-            withContext(Dispatchers.Main) {
-                allFiles = files
-                analyzedMap = statusMap
-                selectedFileUris = files.filter { file ->
-                    !BeatProfile.entries.all { profile -> statusMap[file.uri to profile] == true }
-                }.map { it.uri }.toSet()
-                isScanning = false
-            }
-        }
+        vm.loadFiles(context, folderUris)
     }
 
     AlertDialog(
@@ -63,7 +39,7 @@ fun BackgroundAnalysisDialog(onDismiss: () -> Unit, onStart: (List<Triple<Uri, S
         modifier = Modifier.fillMaxWidth(0.95f),
         title = { Text("Background Batch Analysis") },
         text = {
-            if (isScanning) {
+            if (vm.isScanning) {
                 Box(modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -79,8 +55,8 @@ fun BackgroundAnalysisDialog(onDismiss: () -> Unit, onStart: (List<Triple<Uri, S
                     ) {
                         BeatProfile.entries.forEach { profile ->
                             FilterChip(
-                                selected = profile in selectedProfiles,
-                                onClick = { selectedProfiles = if (profile in selectedProfiles) selectedProfiles - profile else selectedProfiles + profile },
+                                selected = profile in vm.selectedProfiles,
+                                onClick = { vm.toggleProfileSelection(profile) },
                                 label = { Text(profile.name) }
                             )
                         }
@@ -92,24 +68,21 @@ fun BackgroundAnalysisDialog(onDismiss: () -> Unit, onStart: (List<Triple<Uri, S
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        TextButton(onClick = { selectedFileUris = allFiles.map { it.uri }.toSet() }) { Text("All", fontSize = 12.sp) }
-                        TextButton(onClick = { selectedFileUris = emptySet() }) { Text("None", fontSize = 12.sp) }
-                        TextButton(onClick = { selectedFileUris = allFiles.filter { it.durationMs < 300000 }.map { it.uri }.toSet() }) { Text("Skip Long", fontSize = 12.sp) }
+                        TextButton(onClick = { vm.selectAll() }) { Text("All", fontSize = 12.sp) }
+                        TextButton(onClick = { vm.selectNone() }) { Text("None", fontSize = 12.sp) }
+                        TextButton(onClick = { vm.selectSkipLong() }) { Text("Skip Long", fontSize = 12.sp) }
                     }
 
-                    Text("Tracks (${selectedFileUris.size}/${allFiles.size}):", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+                    Text("Tracks (${vm.selectedFileUris.size}/${vm.allFiles.size}):", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
                     LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(allFiles) { file ->
-                            val isDone = selectedProfiles.isNotEmpty() && selectedProfiles.all { analyzedMap[file.uri to it] == true }
+                        items(vm.allFiles) { file ->
+                            val isDone = vm.selectedProfiles.isNotEmpty() && vm.selectedProfiles.all { vm.analyzedMap[file.uri to it] == true }
                             val isLong = file.durationMs > 300000
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    selectedFileUris =
-                                        if (file.uri in selectedFileUris) selectedFileUris - file.uri else selectedFileUris + file.uri
-                                }
+                                .clickable { vm.toggleFileSelection(file.uri) }
                                 .padding(vertical = 4.dp)) {
-                                Checkbox(checked = file.uri in selectedFileUris, onCheckedChange = null)
+                                Checkbox(checked = file.uri in vm.selectedFileUris, onCheckedChange = null)
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = file.name,
@@ -138,12 +111,12 @@ fun BackgroundAnalysisDialog(onDismiss: () -> Unit, onStart: (List<Triple<Uri, S
         },
         confirmButton = {
             Button(onClick = {
-                val selected = allFiles.filter { it.uri in selectedFileUris }.map { Triple(it.uri, it.name, it.parentUri) }
+                val selected = vm.allFiles.filter { it.uri in vm.selectedFileUris }.map { Triple(it.uri, it.name, it.parentUri) }
                 activity?.runWithNotificationPermission {
-                    onStart(selected, selectedProfiles)
+                    onStart(selected, vm.selectedProfiles)
                 }
-            }, enabled = selectedFileUris.isNotEmpty() && selectedProfiles.isNotEmpty() && activity != null) {
-                Text("Start (${selectedFileUris.size * selectedProfiles.size} Tasks)")
+            }, enabled = vm.selectedFileUris.isNotEmpty() && vm.selectedProfiles.isNotEmpty() && activity != null) {
+                Text("Start (${vm.selectedFileUris.size * vm.selectedProfiles.size} Tasks)")
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
