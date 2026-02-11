@@ -473,6 +473,13 @@ fun VisualizerIcon(onRes: Int, offRes: Int, intensity: Float, activeColor: Color
             )
         }
         Text(label, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = color.copy(alpha = 0.8f), maxLines = 1)
+        val percentage = (animatedIntensity * 100).toInt()
+        Text(
+            text = "$percentage%",
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            color = color.copy(alpha = 0.7f)
+        )
     }
 }
 

@@ -59,7 +59,7 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
     val triggerNext by vm.triggerNext
 
     // Layout Management
-    var componentOrder by remember { mutableStateOf(listOf("Haptic", "Audio", "Progress", "Controls1", "Controls2")) }
+    var componentOrder by remember { mutableStateOf(listOf("Haptic", "Audio", "Progress", "Controls1", "Controls2", "Controls3")) }
     
     // Animation for reorder button cue
     val infiniteTransition = rememberInfiniteTransition(label = "flash")
@@ -353,6 +353,30 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                                             Icon(Icons.Default.VolumeUp, "Boost", tint = if (SettingsManager.volumeBoost > 1.0f) MaterialTheme.colorScheme.primary else Color.Gray) 
                                         }
                                         IconButton(onClick = { vm.nextTrack(context) }) { Icon(Icons.Default.SkipNext, "Next") }
+                                    }
+                                    "Controls3" -> Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.VolumeUp, "Volume", modifier = Modifier.padding(end = 8.dp), tint = Color.Gray)
+                                            Slider(
+                                                value = SettingsManager.mediaVolume,
+                                                onValueChange = { 
+                                                    SettingsManager.mediaVolume = it
+                                                    BeatDetector.syncPlaybackSettings()
+                                                    // No need to save here, as it's a live adjustment
+                                                },
+                                                onValueChangeFinished = { SettingsManager.save() },
+                                                valueRange = 0f..1f
+                                            )
+                                        }
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Vibration, "Intensity", modifier = Modifier.padding(end = 8.dp), tint = Color.Gray)
+                                            Slider(
+                                                value = SettingsManager.beatMaxIntensity,
+                                                onValueChange = { SettingsManager.beatMaxIntensity = it },
+                                                onValueChangeFinished = { SettingsManager.save() },
+                                                valueRange = 0f..1f
+                                            )
+                                        }
                                     }
                                 }
                             }

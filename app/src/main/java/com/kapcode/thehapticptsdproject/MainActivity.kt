@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -144,6 +145,7 @@ class MainActivity : ComponentActivity() {
 fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -153,7 +155,7 @@ fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel) {
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(320.dp)
-                        .padding(16.dp)
+                        .padding(horizontal = 24.dp, vertical = 16.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
                     Text("Settings", style = MaterialTheme.typography.headlineSmall)
@@ -397,6 +399,8 @@ fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel) {
 
 @Composable
 fun MainScreen(modifier: Modifier = Modifier, playerVm: BeatPlayerViewModel) {
+    val context = LocalContext.current
+    val modesViewModel: ModesViewModel = viewModel(factory = ModesViewModelFactory(context.applicationContext))
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -405,7 +409,7 @@ fun MainScreen(modifier: Modifier = Modifier, playerVm: BeatPlayerViewModel) {
     ) {
         Spacer(Modifier.height(8.dp))
 
-        ModesSection()
+        ModesSection(viewModel = modesViewModel)
         Spacer(Modifier.height(16.dp))
 
         HapticControlCard()

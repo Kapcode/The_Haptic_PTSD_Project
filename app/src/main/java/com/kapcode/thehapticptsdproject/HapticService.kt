@@ -24,6 +24,7 @@ import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.combine
 import kotlin.math.sqrt
+import com.kapcode.thehapticptsdproject.Logger
 
 /**
  * A foreground service responsible for managing all background operations.
@@ -170,7 +171,9 @@ class HapticService : Service(), SensorEventListener {
                 playVibration(duration, amplitude)
             }
             ACTION_CANCEL_VIBRATION -> {
-                vibrator?.cancel()
+                if (vibrator?.hasVibrator() == true) {
+                    vibrator?.cancel()
+                }
             }
         }
         return START_STICKY
@@ -178,7 +181,11 @@ class HapticService : Service(), SensorEventListener {
     
     @RequiresApi(Build.VERSION_CODES.O)
     private fun playVibration(durationMs: Long, amplitude: Int) {
-        vibrator?.vibrate(VibrationEffect.createOneShot(durationMs, amplitude))
+        if (vibrator?.hasVibrator() == true) {
+            vibrator?.vibrate(VibrationEffect.createOneShot(durationMs, amplitude))
+        } else {
+            //Logger.warn("Vibrator not available on this device.")
+        }
     }
 
     private fun updateNotification(hState: HapticState, bState: BeatPlayerState) {
