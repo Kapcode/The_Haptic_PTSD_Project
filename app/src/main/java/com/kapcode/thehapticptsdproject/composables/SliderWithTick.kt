@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,10 +22,11 @@ fun SliderWithTick(
     enabled: Boolean = true
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        Slider(
+        AnimatedSlider(
             value = value,
             onValueChange = onValueChange,
             valueRange = valueRange,
+            defaultValue = defaultValue,
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled
         )

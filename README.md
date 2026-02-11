@@ -18,30 +18,16 @@ A primary therapeutic feature where the user activates a comforting, rhythmic "h
 ### Bilateral Beat Player
 Analyze any audio file from your library to generate a custom haptic profile. The app uses advanced signal processing to "feel" the music, providing synchronized tactile feedback that matches the intensity and duration of detected transients.
 - **Advanced Controls**: Full playback control including Repeat (One/All), Next/Previous track, Playback Speed (0.5x to 2.0x), and a 1.5x Volume Boost.
-- **Automatic Analysis**: Missing a profile for a track? The app automatically queues it for background analysis as soon as it's selected.
 - **Live Profile Switching**: Switch between Bass, Drum, Guitar, and Amplitude profiles seamlessly during playback. The haptics update instantly to match the new profile.
-- **Sync Offset Adjustment**: Precision-tune the timing between audio and haptics to account for different hardware latencies.
-- **Seamless Track Changes**: Selecting a new track now automatically stops the old one and resets the UI, ensuring a clean and predictable transition.
+
+### Accessibility & Tactile Feedback
+The app is designed to be inclusive and responsive to user needs:
+- **Customizable Typography**: Adjust Heading, Regular, Title, Button, and Notation font sizes independently via a dedicated Accessibility card. Minimum bounds are enforced to ensure legibility.
+- **Application Haptic Signatures**: Every interaction—snapping a slider, toggling a switch, or clicking a button—now has a distinct tactile signature, providing immediate physical confirmation of your actions.
+- **Emergency Recovery**: The "Hold to Reset" button maintains a fixed, legible size regardless of other font adjustments, ensuring you can always restore your environment.
 
 ### Multi-Layer Audio Visualizer
-A high-resolution, 32-band frequency visualizer available in-app and via persistent notification. It supports independent, overlapping layers that can be toggled in settings:
-- **Vertical Bars (Live HZ)**: Detailed frequency-specific feedback with subtle threshold lines.
-- **Channel Intensity (L/R)**: Real-time volume levels for left and right channels.
-- **Waveform**: A fluid background representation of the overall audio energy.
-- **Dynamic Theming**: The app's primary color updates live to match the color of the selected haptic profile (Cyan, Tan, Orange, or Green).
-- **Dual Threshold Lines**: The visualizer displays both the bar's trigger threshold (White) and the icon's animation threshold (Red), providing a clear visual distinction.
-
-### Smooth, Calming Animations
-All visual feedback—including frequency bars, haptic icons, and progress indicators—uses non-bouncy, medium-stiffness spring animations for a more responsive feel. Active profiles now feature a circular "glow" effect when triggered, providing a clear visual link between the sound and the haptic pulse.
-
-### Settings Drawer & Workspace Management
-Configuration settings are now neatly tucked away in a side navigation drawer, keeping the main workspace focused on therapeutic monitoring and playback. This includes visualizer scaling, gain controls, and snapping increments.
-
-### Intelligent Auto-Selection & Management
-The app automatically prepares your therapeutic environment by choosing the best available audio track on startup. It prioritizes previously analyzed files and remembers your last played track. 
-
-### Notification Media Controls
-Full media playback controls are integrated directly into the persistent notification. This allows you to play, pause, stop, and skip forward or backward without needing to open the app.
+A high-resolution, 32-band frequency visualizer available in-app and via persistent notification. It supports independent, overlapping layers that can be toggled in settings.
 
 ### Privacy First
 Built for the most sensitive contexts, all detection and analysis happen locally on the device. No audio or sensor data is recorded permanently or sent to external servers, ensuring total user confidentiality.

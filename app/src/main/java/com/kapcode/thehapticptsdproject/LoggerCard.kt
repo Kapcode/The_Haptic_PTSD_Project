@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kapcode.thehapticptsdproject.composables.AnimatedSwitch
 import com.kapcode.thehapticptsdproject.composables.SectionCard
 
 @Composable
@@ -70,7 +71,7 @@ fun LoggerCard(vm: LoggerViewModel = viewModel()) {
                 if (isDeveloperMode) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Logcat", style = MaterialTheme.typography.bodySmall)
-                        Switch(
+                        AnimatedSwitch(
                             checked = logToLogcat,
                             onCheckedChange = {
                                 logToLogcat = it

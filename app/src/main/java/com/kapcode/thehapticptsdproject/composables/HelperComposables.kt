@@ -66,7 +66,7 @@ fun SectionCard(
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp, horizontal = 16.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -78,8 +78,7 @@ fun SectionCard(
                         text = title,
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        overflow = TextOverflow.Clip,
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     if (isExperimental) {

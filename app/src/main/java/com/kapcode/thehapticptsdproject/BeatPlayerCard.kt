@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kapcode.thehapticptsdproject.composables.AnimatedSwitch
 import com.kapcode.thehapticptsdproject.composables.FileItem
 import com.kapcode.thehapticptsdproject.composables.FolderItem
 import com.kapcode.thehapticptsdproject.composables.InPlayerHapticVisualizer
@@ -188,7 +189,7 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
             ) {
                 Text("Analyzed", style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.width(8.dp))
-                Switch(
+                AnimatedSwitch(
                     checked = SettingsManager.isLiveHapticsEnabled,
                     onCheckedChange = {
                         SettingsManager.isLiveHapticsEnabled = it
@@ -357,24 +358,36 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                                     "Controls3" -> Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(Icons.Default.VolumeUp, "Volume", modifier = Modifier.padding(end = 8.dp), tint = Color.Gray)
-                                            Slider(
+                                            SliderWithTick(
                                                 value = SettingsManager.mediaVolume,
-                                                onValueChange = { 
+                                                onValueChange = {
                                                     SettingsManager.mediaVolume = it
                                                     BeatDetector.syncPlaybackSettings()
                                                     // No need to save here, as it's a live adjustment
                                                 },
-                                                onValueChangeFinished = { SettingsManager.save() },
-                                                valueRange = 0f..1f
+                                                valueRange = 0f..1f,
+                                                defaultValue = 0.9f,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Text(
+                                                text = "${(SettingsManager.mediaVolume * 100).toInt()}%",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                modifier = Modifier.width(40.dp)
                                             )
                                         }
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(Icons.Default.Vibration, "Intensity", modifier = Modifier.padding(end = 8.dp), tint = Color.Gray)
-                                            Slider(
+                                            SliderWithTick(
                                                 value = SettingsManager.beatMaxIntensity,
                                                 onValueChange = { SettingsManager.beatMaxIntensity = it },
-                                                onValueChangeFinished = { SettingsManager.save() },
-                                                valueRange = 0f..1f
+                                                valueRange = 0f..1f,
+                                                defaultValue = 0.9f,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Text(
+                                                text = "${(SettingsManager.beatMaxIntensity * 100).toInt()}%",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                modifier = Modifier.width(40.dp)
                                             )
                                         }
                                     }

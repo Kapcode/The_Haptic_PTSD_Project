@@ -18,7 +18,7 @@ import com.kapcode.thehapticptsdproject.composables.SliderWithTick
 @Composable
 fun HapticControlCard(vm: HapticControlViewModel = viewModel()) {
     val state by vm.hapticState.collectAsState()
-    SectionCard(title = "Haptic Settings") {
+    SectionCard(title = "Active Heartbeat Settings") {
         Text("Intensity: ${(state.intensity * 100).toInt()}%")
         SliderWithTick(
             value = state.intensity,

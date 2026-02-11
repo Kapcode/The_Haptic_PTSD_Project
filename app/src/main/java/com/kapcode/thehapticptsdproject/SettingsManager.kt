@@ -95,6 +95,12 @@ object SettingsManager {
     var scaleAudioVisualizerX by mutableStateOf(1.0f)
     var scaleAudioVisualizerY by mutableStateOf(1.0f)
 
+    // Accessibility Settings (Font Sizes)
+    var fontSizeRegular by mutableStateOf(14f)
+    var fontSizeCardTitle by mutableStateOf(18f)
+    var fontSizeButton by mutableStateOf(14f)
+    var fontSizeCardNotation by mutableStateOf(12f)
+    var fontSizeCardHeading by mutableStateOf(22f)
 
     // Experimental Switch
     var isExperimentalEnabled by mutableStateOf(false)
@@ -115,6 +121,7 @@ object SettingsManager {
     var snapTriggerThreshold by mutableStateOf(0f)
     var snapScaleVibration by mutableStateOf(0f)
     var snapScaleAudio by mutableStateOf(0f)
+    var snapDefaultValue by mutableStateOf(0.05f)
 
 
     // Logging
@@ -189,6 +196,12 @@ object SettingsManager {
         scaleAudioVisualizerX = prefs.getFloat("scale_audio_visualizer_x", 1.0f)
         scaleAudioVisualizerY = prefs.getFloat("scale_audio_visualizer_y", 1.0f)
         
+        fontSizeRegular = prefs.getFloat("font_size_regular", 14f).coerceAtLeast(8f)
+        fontSizeCardTitle = prefs.getFloat("font_size_card_title", 18f).coerceAtLeast(10f)
+        fontSizeButton = prefs.getFloat("font_size_button", 14f).coerceAtLeast(8f)
+        fontSizeCardNotation = prefs.getFloat("font_size_card_notation", 12f).coerceAtLeast(6f)
+        fontSizeCardHeading = prefs.getFloat("font_size_card_heading", 22f).coerceAtLeast(12f)
+
         isExperimentalEnabled = prefs.getBoolean("experimental_enabled", false)
 
         snapIntensity = prefs.getFloat("snap_intensity", 0f)
@@ -206,6 +219,7 @@ object SettingsManager {
         snapTriggerThreshold = prefs.getFloat("snap_trigger_threshold", 0f)
         snapScaleVibration = prefs.getFloat("snap_scale_vibration", 0f)
         snapScaleAudio = prefs.getFloat("snap_scale_audio", 0f)
+        snapDefaultValue = prefs.getFloat("snap_default_value", 0.05f)
 
         logToLogcat = prefs.getBoolean("log_to_logcat", false)
         authorizedFolderUris = prefs.getStringSet("authorized_folder_uris", emptySet()) ?: emptySet()
@@ -269,6 +283,12 @@ object SettingsManager {
             putFloat("scale_audio_visualizer_x", scaleAudioVisualizerX)
             putFloat("scale_audio_visualizer_y", scaleAudioVisualizerY)
             
+            putFloat("font_size_regular", fontSizeRegular.coerceAtLeast(8f))
+            putFloat("font_size_card_title", fontSizeCardTitle.coerceAtLeast(10f))
+            putFloat("font_size_button", fontSizeButton.coerceAtLeast(8f))
+            putFloat("font_size_card_notation", fontSizeCardNotation.coerceAtLeast(6f))
+            putFloat("font_size_card_heading", fontSizeCardHeading.coerceAtLeast(12f))
+
             putBoolean("experimental_enabled", isExperimentalEnabled)
 
             putFloat("snap_intensity", snapIntensity)
@@ -286,6 +306,7 @@ object SettingsManager {
             putFloat("snap_trigger_threshold", snapTriggerThreshold)
             putFloat("snap_scale_vibration", snapScaleVibration)
             putFloat("snap_scale_audio", snapScaleAudio)
+            putFloat("snap_default_value", snapDefaultValue)
             putBoolean("log_to_logcat", logToLogcat)
             putStringSet("authorized_folder_uris", authorizedFolderUris)
             apply()
@@ -347,6 +368,12 @@ object SettingsManager {
         scaleAudioVisualizerX = 1.0f
         scaleAudioVisualizerY = 1.0f
         
+        fontSizeRegular = 14f
+        fontSizeCardTitle = 18f
+        fontSizeButton = 14f
+        fontSizeCardNotation = 12f
+        fontSizeCardHeading = 22f
+        
         isExperimentalEnabled = false
         
         snapIntensity = 0f
@@ -364,6 +391,7 @@ object SettingsManager {
         snapTriggerThreshold = 0f
         snapScaleVibration = 0f
         snapScaleAudio = 0f
+        snapDefaultValue = 0.05f
         
         save()
     }
