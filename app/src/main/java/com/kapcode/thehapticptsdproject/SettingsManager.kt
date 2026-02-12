@@ -1,3 +1,5 @@
+@file:Suppress("RemoveExplicitTypeArguments", "unused")
+
 package com.kapcode.thehapticptsdproject
 
 import android.content.Context

@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package com.kapcode.thehapticptsdproject
 
 import android.content.Context

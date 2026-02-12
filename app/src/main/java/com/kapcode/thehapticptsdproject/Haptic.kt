@@ -1,3 +1,7 @@
+@file:Suppress(
+    "unused"
+)
+
 package com.kapcode.thehapticptsdproject
 
 import android.content.Context
@@ -12,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.lang.ref.WeakReference
 
 /**
  * Singleton object for managing haptic feedback and visualizer state.
@@ -63,8 +68,73 @@ data class HapticState(
     val visualizerData: FloatArray = FloatArray(32),
     val resetCounter: Int = 0,
     val pauseStartTime: Long = 0
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
 
+        other as HapticState
+
+        if (intensity != other.intensity) return false
+        if (bpm != other.bpm) return false
+        if (sessionDurationSeconds != other.sessionDurationSeconds) return false
+        if (isHeartbeatRunning != other.isHeartbeatRunning) return false
+        if (remainingSeconds != other.remainingSeconds) return false
+        if (isTestRunning != other.isTestRunning) return false
+        if (testPulseCount != other.testPulseCount) return false
+        if (leadInMs != other.leadInMs) return false
+        if (leadOutMs != other.leadOutMs) return false
+        if (phoneLeftIntensity != other.phoneLeftIntensity) return false
+        if (phoneRightIntensity != other.phoneRightIntensity) return false
+        if (controllerLeftTopIntensity != other.controllerLeftTopIntensity) return false
+        if (controllerLeftBottomIntensity != other.controllerLeftBottomIntensity) return false
+        if (controllerRightTopIntensity != other.controllerRightTopIntensity) return false
+        if (controllerRightBottomIntensity != other.controllerRightBottomIntensity) return false
+        if (resetCounter != other.resetCounter) return false
+        if (pauseStartTime != other.pauseStartTime) return false
+        if (phoneLeftColor != other.phoneLeftColor) return false
+        if (phoneRightColor != other.phoneRightColor) return false
+        if (controllerLeftTopColor != other.controllerLeftTopColor) return false
+        if (controllerLeftBottomColor != other.controllerLeftBottomColor) return false
+        if (controllerRightTopColor != other.controllerRightTopColor) return false
+        if (controllerRightBottomColor != other.controllerRightBottomColor) return false
+        if (activeProfiles != other.activeProfiles) return false
+        if (!visualizerData.contentEquals(other.visualizerData)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = intensity.hashCode()
+        result = 31 * result + bpm
+        result = 31 * result + sessionDurationSeconds
+        result = 31 * result + isHeartbeatRunning.hashCode()
+        result = 31 * result + remainingSeconds
+        result = 31 * result + isTestRunning.hashCode()
+        result = 31 * result + testPulseCount
+        result = 31 * result + leadInMs
+        result = 31 * result + leadOutMs
+        result = 31 * result + phoneLeftIntensity.hashCode()
+        result = 31 * result + phoneRightIntensity.hashCode()
+        result = 31 * result + controllerLeftTopIntensity.hashCode()
+        result = 31 * result + controllerLeftBottomIntensity.hashCode()
+        result = 31 * result + controllerRightTopIntensity.hashCode()
+        result = 31 * result + controllerRightBottomIntensity.hashCode()
+        result = 31 * result + resetCounter
+        result = 31 * result + pauseStartTime.hashCode()
+        result = 31 * result + phoneLeftColor.hashCode()
+        result = 31 * result + phoneRightColor.hashCode()
+        result = 31 * result + controllerLeftTopColor.hashCode()
+        result = 31 * result + controllerLeftBottomColor.hashCode()
+        result = 31 * result + controllerRightTopColor.hashCode()
+        result = 31 * result + controllerRightBottomColor.hashCode()
+        result = 31 * result + activeProfiles.hashCode()
+        result = 31 * result + visualizerData.contentHashCode()
+        return result
+    }
+}
+
+@Suppress("unused")
 object HapticManager {
     private val _state = MutableStateFlow(HapticState())
     val state = _state.asStateFlow()
@@ -72,10 +142,10 @@ object HapticManager {
     private var sessionJob: Job? = null
     private var testJob: Job? = null
     private var visualizerResetJob: Job? = null
-    private lateinit var context: Context
+    private var contextRef: WeakReference<Context>? = null
 
     fun init(context: Context) {
-        this.context = context.applicationContext
+        this.contextRef = WeakReference(context.applicationContext)
         _state.value = _state.value.copy(
             leadInMs = SettingsManager.hapticLeadInMs,
             leadOutMs = SettingsManager.hapticLeadOutMs
@@ -106,7 +176,7 @@ object HapticManager {
                     
                     // Clear active profiles if NO device is vibrating
                     val newActiveProfiles = if (!anyMotorActive) {
-                        emptySet<BeatProfile>()
+                        emptySet()
                     } else {
                         current.activeProfiles
                     }
@@ -160,10 +230,8 @@ object HapticManager {
     }
 
     fun startHeartbeatSession() {
-        val playerState = BeatDetector.playerState.value
-        if (playerState.isPlaying || playerState.isPaused) {
-            return 
-        }
+        // If BBPlayer is playing or paused, stop it before starting a new session.
+        BeatDetector.stopPlayback()
 
         if (_state.value.isHeartbeatRunning) {
             _state.value = _state.value.copy(remainingSeconds = _state.value.sessionDurationSeconds)
@@ -343,7 +411,7 @@ object HapticManager {
     }
 
     private fun sendIntentToService(action: String, extras: Intent.() -> Unit = {}) {
-        if (!::context.isInitialized) return
+        val context = contextRef?.get() ?: return
         val intent = Intent(context, HapticService::class.java).apply {
             this.action = action
             extras()

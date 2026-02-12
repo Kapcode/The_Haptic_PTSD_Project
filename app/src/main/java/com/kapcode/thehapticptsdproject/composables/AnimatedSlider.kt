@@ -1,20 +1,30 @@
+@file:Suppress("ControlFlowWithEmptyBody")
+
 package com.kapcode.thehapticptsdproject.composables
 
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Slider
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kapcode.thehapticptsdproject.AnimationSettingsViewModel
+import com.kapcode.thehapticptsdproject.ApplicationHapticEffects
 import com.kapcode.thehapticptsdproject.Logger
 import com.kapcode.thehapticptsdproject.SettingsManager
-import com.kapcode.thehapticptsdproject.ApplicationHapticEffects
 import kotlin.math.abs
 
 @Composable
@@ -87,7 +97,9 @@ fun AnimatedSlider(
 
                 onValueChange(finalValue)
             },
-            modifier = Modifier.fillMaxWidth().alpha(alpha),
+            modifier = Modifier
+                .fillMaxWidth()
+                .alpha(alpha),
             enabled = enabled,
             valueRange = valueRange,
             onValueChangeFinished = onValueChangeFinished

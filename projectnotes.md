@@ -11,8 +11,10 @@ This document contains technical details, architectural decisions, and developme
 - **Architecture:** MVVM with ViewModels (`BeatPlayerViewModel`, `ModesViewModel`, `ExperimentalSettingsViewModel`, etc.)
 - **Background Logic:** Android Foreground Service (`HapticService.kt`) with `PARTIAL_WAKE_LOCK`.
 - **Persistence:** `SharedPreferences` managed via `SettingsManager.kt`. 
-    - **State Management**: Uses Compose `mutableStateOf` with delegates for real-time reactivity.
+    - **State Management**: Uses specialized Compose states (`mutableFloatStateOf`,
+      `mutableIntStateOf`) to avoid primitive boxing and improve performance.
     - **Device Assignments**: Routings are persisted as JSON strings using `kotlinx.serialization`.
+    - **Version Catalog**: Project dependencies are managed via `libs.versions.toml`.
 
 ## Core Hardware Integration
 
@@ -67,5 +69,9 @@ This document contains technical details, architectural decisions, and developme
     - **Cause**: `BeatDetector.resetPlayer()` was clearing the `selectedFileUri`, which is required
       for the controls to be visible.
     - **Solution**: Modified `resetPlayer()` to preserve the `selectedFileUri` and
-      `selectedFileName` while resetting all other playback-related states. This ensures the UI
-      remains intact after a reset.
+      `selectedFileName` while resetting all other playback-related states.
+- **FIXED**: "Start Session" button would occasionally fail after pausing a BBPlayer track.
+    - **Cause**: The `HapticManager` logic was being blocked by the `BeatDetector` remaining in a
+      paused state.
+    - **Solution**: Added an explicit `BeatDetector.stopPlayback()` call at the beginning of
+      `HapticManager.startHeartbeatSession()` to ensure a clean state for the new session.

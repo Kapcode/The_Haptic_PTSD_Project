@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package com.kapcode.thehapticptsdproject.composables
 
 import androidx.compose.animation.core.LinearEasing
@@ -17,7 +19,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kapcode.thehapticptsdproject.AnimationSettingsViewModel
 import com.kapcode.thehapticptsdproject.Logger
-import kotlin.random.Random
 
 @Composable
 fun DitheringBox(

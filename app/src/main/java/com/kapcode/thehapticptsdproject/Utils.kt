@@ -4,10 +4,11 @@ import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.DocumentsContract
+import kotlin.math.roundToInt
 
 fun applySnap(value: Float, snap: Float): Float {
     if (snap <= 0f) return value
-    return (Math.round(value / snap) * snap).coerceIn(0f..1000000f)
+    return ((value / snap).roundToInt() * snap).coerceIn(0f..1000000f)
 }
 
 fun getAudioFiles(context: Context, folderUri: Uri): List<Pair<String, Uri>> {

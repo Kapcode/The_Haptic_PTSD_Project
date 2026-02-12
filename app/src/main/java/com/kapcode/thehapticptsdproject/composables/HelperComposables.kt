@@ -1,4 +1,3 @@
-
 package com.kapcode.thehapticptsdproject.composables
 
 import androidx.compose.animation.AnimatedVisibility
@@ -392,19 +391,19 @@ fun InPlayerAudioVisualizer(selectedProfile: BeatProfile? = null) {
     }
 }
 
-private fun getProfileForIndex(index: Int): BeatProfile? = when {
-    index == 0 -> BeatProfile.AMPLITUDE
-    index in 1..2 -> BeatProfile.BASS
-    index in 3..5 -> BeatProfile.DRUM
-    index in 6..12 -> BeatProfile.GUITAR
+private fun getProfileForIndex(index: Int): BeatProfile? = when (index) {
+    0 -> BeatProfile.AMPLITUDE
+    in 1..2 -> BeatProfile.BASS
+    in 3..5 -> BeatProfile.DRUM
+    in 6..12 -> BeatProfile.GUITAR
     else -> null
 }
 
-private fun getThresholdsForIndex(index: Int): Pair<Float?, Float?> = when {
-    index == 0 -> 0.4f to SettingsManager.triggerThresholdAmplitude
-    index in 1..2 -> 0.5f to SettingsManager.triggerThresholdBass
-    index in 3..5 -> 0.5f to SettingsManager.triggerThresholdDrum
-    index in 6..12 -> 0.5f to SettingsManager.triggerThresholdGuitar
+private fun getThresholdsForIndex(index: Int): Pair<Float?, Float?> = when (index) {
+    0 -> 0.4f to SettingsManager.triggerThresholdAmplitude
+    in 1..2 -> 0.5f to SettingsManager.triggerThresholdBass
+    in 3..5 -> 0.5f to SettingsManager.triggerThresholdDrum
+    in 6..12 -> 0.5f to SettingsManager.triggerThresholdGuitar
     else -> null to null
 }
 

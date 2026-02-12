@@ -1,6 +1,5 @@
 package com.kapcode.thehapticptsdproject
 
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Row
@@ -19,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kapcode.thehapticptsdproject.composables.SectionCard
 
@@ -39,7 +39,7 @@ fun MediaFoldersCard(vm: MediaFoldersViewModel = viewModel()) {
             ) {
                 Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.primary)
                 Text(
-                    Uri.parse(u).path?.substringAfterLast(':') ?: "Folder",
+                    u.toUri().path?.substringAfterLast(':') ?: "Folder",
                     modifier = Modifier
                         .weight(1f)
                         .padding(start = 8.dp)

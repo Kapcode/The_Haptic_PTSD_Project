@@ -1,3 +1,5 @@
+@file:Suppress("SameParameterValue", "SameParameterValue", "SameParameterValue")
+
 package com.kapcode.thehapticptsdproject
 
 import android.app.Notification

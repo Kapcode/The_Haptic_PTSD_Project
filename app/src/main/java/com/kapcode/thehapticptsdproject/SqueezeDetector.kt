@@ -1,3 +1,5 @@
+@file:Suppress("RedundantSuspendModifier")
+
 package com.kapcode.thehapticptsdproject
 
 import android.annotation.SuppressLint
@@ -16,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.jtransforms.fft.DoubleFFT_1D
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 data class SqueezeDetectorState(
@@ -64,6 +67,7 @@ class SqueezeDetector(
         private const val TRIGGER_DELAY_MS = 200L
     }
 
+    @SuppressLint("DefaultLocale")
     fun setSqueezeThreshold(percent: Double) {
         _state.value = _state.value.copy(squeezeThresholdPercent = percent)
         Logger.info("Squeeze threshold updated to ${String.format("%.0f", percent * 100)}%")
@@ -159,7 +163,7 @@ class SqueezeDetector(
             try {
                 while (isRunning.get()) {
                     for (i in buffer.indices) {
-                        val sinValue = Math.sin(angle)
+                        val sinValue = sin(angle)
                         buffer[i] = (sinValue * Short.MAX_VALUE).toInt().toShort()
                         angle += 2 * Math.PI * frequency / sampleRate
                     }

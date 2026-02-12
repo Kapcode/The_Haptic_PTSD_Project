@@ -1,12 +1,15 @@
 package com.kapcode.thehapticptsdproject
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 
-class ModesViewModel(private val context: Context) : ViewModel() {
+class ModesViewModel(@SuppressLint("StaticFieldLeak") private val context: Context) : ViewModel() {
     val modeState = mutableStateOf(ModeState(activeModes = emptySet()))
+
+    private val appContext = context.applicationContext
 
     fun onModeToggled(mode: PTSDMode) {
         val currentModes = modeState.value.activeModes.toMutableSet()
@@ -29,12 +32,12 @@ class ModesViewModel(private val context: Context) : ViewModel() {
     }
 
     private fun updateHapticService() {
-        val intent = Intent(context, HapticService::class.java).apply {
+        val intent = Intent(appContext, HapticService::class.java).apply {
             action = HapticService.ACTION_UPDATE_MODES
             putExtra(HapticService.EXTRA_HEARTBEAT_ACTIVE, PTSDMode.ActiveHeartbeat in modeState.value.activeModes)
             putExtra(HapticService.EXTRA_BB_PLAYER_ACTIVE, PTSDMode.BBPlayer in modeState.value.activeModes)
         }
-        context.startService(intent)
+        appContext.startService(intent)
         Logger.info("UI: Sent mode update to HapticService.")
     }
 }

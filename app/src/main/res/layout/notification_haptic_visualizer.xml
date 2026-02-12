@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="8dp"
-    android:background="#1A1C1E">
+    android:background="#1A1C1E"
+    tools:ignore="Overdraw">
 
     <RelativeLayout
         android:layout_width="match_parent"
@@ -13,7 +15,7 @@
             android:id="@+id/notification_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="The Haptic PTSD Project"
+            android:text="@string/the_haptic_ptsd_project"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
             android:textSize="14sp" />
@@ -22,7 +24,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_below="@id/notification_title"
-            android:text="Detection Active"
+            android:text="@string/detection_active"
             android:textColor="#CCCCCC"
             android:textSize="11sp" />
     </RelativeLayout>
@@ -41,7 +43,7 @@
             android:layout_height="28dp"
             android:src="@drawable/phone_left_on"
             android:layout_marginEnd="6dp"
-            android:contentDescription="Phone left haptic indicator" />
+            android:contentDescription="@string/phone_left_haptic_indicator" />
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -53,13 +55,13 @@
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:src="@drawable/controller_left_on"
-                android:contentDescription="Left controller top haptic indicator" />
+                android:contentDescription="@string/left_controller_top_haptic_indicator" />
             <ImageView
                 android:id="@+id/img_controller_left_bottom"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:src="@drawable/controller_left_on"
-                android:contentDescription="Left controller bottom haptic indicator" />
+                android:contentDescription="@string/left_controller_bottom_haptic_indicator" />
         </LinearLayout>
 
         <!-- Audio Visualizer Area -->
@@ -104,14 +106,28 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:layout_marginBottom="2dp">
-                    <TextView android:layout_width="12dp" android:layout_height="wrap_content" android:text="L" android:textColor="#FFFFFF" android:textSize="9sp" />
+
+                    <TextView
+                        android:layout_width="12dp"
+                        android:layout_height="wrap_content"
+                        android:text="@string/l"
+                        android:textColor="#FFFFFF"
+                        android:textSize="9sp"
+                        tools:ignore="SmallSp" />
                     <ProgressBar android:id="@+id/progress_left" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="6dp" android:progressDrawable="@android:drawable/progress_horizontal" />
                 </LinearLayout>
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
-                    <TextView android:layout_width="12dp" android:layout_height="wrap_content" android:text="R" android:textColor="#FFFFFF" android:textSize="9sp" />
+
+                    <TextView
+                        android:layout_width="12dp"
+                        android:layout_height="wrap_content"
+                        android:text="@string/r"
+                        android:textColor="#FFFFFF"
+                        android:textSize="9sp"
+                        tools:ignore="SmallSp" />
                     <ProgressBar android:id="@+id/progress_right" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="6dp" android:progressDrawable="@android:drawable/progress_horizontal" />
                 </LinearLayout>
             </LinearLayout>
@@ -128,7 +144,7 @@
                     android:layout_height="2dp"
                     android:layout_centerInParent="true"
                     android:background="#2196F3"
-                    android:contentDescription="Waveform visualizer" />
+                    android:contentDescription="@string/waveform_visualizer" />
             </RelativeLayout>
         </FrameLayout>
 
@@ -142,13 +158,13 @@
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:src="@drawable/controller_right_on"
-                android:contentDescription="Right controller top haptic indicator" />
+                android:contentDescription="@string/right_controller_top_haptic_indicator" />
             <ImageView
                 android:id="@+id/img_controller_right_bottom"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
                 android:src="@drawable/controller_right_on"
-                android:contentDescription="Right controller bottom haptic indicator" />
+                android:contentDescription="@string/right_controller_bottom_haptic_indicator" />
         </LinearLayout>
 
         <ImageView
@@ -157,7 +173,7 @@
             android:layout_height="28dp"
             android:src="@drawable/phone_right_on"
             android:layout_marginStart="6dp"
-            android:contentDescription="Phone right haptic indicator" />
+            android:contentDescription="@string/phone_right_haptic_indicator" />
     </LinearLayout>
 
     <!-- BBPlayer Controls -->
@@ -190,7 +206,7 @@
                 android:src="@android:drawable/ic_media_rew"
                 android:padding="4dp"
                 android:layout_marginEnd="6dp"
-                android:contentDescription="Replay 30 seconds" />
+                android:contentDescription="@string/replay_30_seconds" />
 
             <ImageView
                 android:id="@+id/btn_replay_5"
@@ -199,7 +215,7 @@
                 android:src="@android:drawable/ic_media_previous"
                 android:padding="4dp"
                 android:layout_marginEnd="10dp"
-                android:contentDescription="Replay 5 seconds" />
+                android:contentDescription="@string/replay_5_seconds" />
 
             <ImageView
                 android:id="@+id/btn_play_pause"
@@ -207,7 +223,7 @@
                 android:layout_height="36dp"
                 android:src="@android:drawable/ic_media_play"
                 android:padding="4dp"
-                android:contentDescription="Play or Pause" />
+                android:contentDescription="@string/play_or_pause" />
 
             <ImageView
                 android:id="@+id/btn_stop"
@@ -215,7 +231,7 @@
                 android:layout_height="36dp"
                 android:src="@android:drawable/ic_menu_close_clear_cancel"
                 android:padding="4dp"
-                android:contentDescription="Stop" />
+                android:contentDescription="@string/stop" />
 
             <ImageView
                 android:id="@+id/btn_forward_5"
@@ -224,7 +240,7 @@
                 android:src="@android:drawable/ic_media_next"
                 android:padding="4dp"
                 android:layout_marginStart="10dp"
-                android:contentDescription="Forward 5 seconds" />
+                android:contentDescription="@string/forward_5_seconds" />
 
             <ImageView
                 android:id="@+id/btn_forward_30"
@@ -233,7 +249,7 @@
                 android:src="@android:drawable/ic_media_ff"
                 android:padding="4dp"
                 android:layout_marginStart="6dp"
-                android:contentDescription="Forward 30 seconds" />
+                android:contentDescription="@string/forward_30_seconds" />
 
         </LinearLayout>
     </LinearLayout>

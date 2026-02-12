@@ -1,9 +1,5 @@
 package com.kapcode.thehapticptsdproject
 
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.content.Context
 
 object ApplicationHapticEffects {
 
