@@ -62,16 +62,50 @@ This document contains technical details, architectural decisions, and developme
 - **Sync Logic**: Uses `currentPos - SettingsManager.hapticSyncOffsetMs` to allow precision alignment (±2000ms).
 - **Advanced Controls**: Implemented Repeat (One/All), Playback Speed, and Volume Boost.
 
-## Current Known Issues / Notes
+## System & Service Notes
 - **Foreground Service**: Requires `FOREGROUND_SERVICE_SPECIAL_USE` and `POST_NOTIFICATIONS` permissions.
-- **WakeLock**: Prevents system sleep during active therapeutic sessions.
-- **FIXED**: BBPlayer card controls would disappear after a "Reset to Defaults" action.
-    - **Cause**: `BeatDetector.resetPlayer()` was clearing the `selectedFileUri`, which is required
-      for the controls to be visible.
-    - **Solution**: Modified `resetPlayer()` to preserve the `selectedFileUri` and
-      `selectedFileName` while resetting all other playback-related states.
-- **FIXED**: "Start Session" button would occasionally fail after pausing a BBPlayer track.
-    - **Cause**: The `HapticManager` logic was being blocked by the `BeatDetector` remaining in a
-      paused state.
-    - **Solution**: Added an explicit `BeatDetector.stopPlayback()` call at the beginning of
-      `HapticManager.startHeartbeatSession()` to ensure a clean state for the new session.
+- **WakeLock**: Prevents system sleep during active therapeutic sessions. Ensure
+  `wakeLock.release()` is called in `onDestroy`.
+
+## Resolved Technical Issues (Changelog)
+
+### Memory Leak: Static Context Reference in HapticManager
+
+- **Problem**: `HapticManager` (a singleton `object`) was holding a direct reference to a `Context`.
+- **Cause**: The `init(context: Context)` method assigned the argument directly to a property. If
+  called with an `Activity` context, it prevented the Activity from being garbage collected after
+  destruction.
+- **Solution**: Refactored the property to a `WeakReference<Context>` and explicitly initialized it
+  with `context.applicationContext`.
+- **Technical Detail**: While `applicationContext` is generally safe to hold in singletons,
+  `WeakReference` provides additional safety and follows strict anti-leak patterns.
+
+### Memory Leak: ViewModel Context Field in ModesViewModel
+
+- **Problem**: `ModesViewModel` was storing a `Context` instance passed via its constructor,
+  triggering a "Static Field Leak" warning.
+- **Cause**: ViewModels can outlive the Activity lifecycle. Holding a direct reference to a
+  Context (especially a UI context) is a primary source of memory leaks in Android.
+- **Solution**: Refactored `ModesViewModel` to inherit from `AndroidViewModel(application)`.
+- **Technical Detail**: This allows the ViewModel to access the `Application` context safely via
+  `getApplication()`. Updated `ModesViewModelFactory` to require an `Application` instance and
+  adjusted `MainActivity` to cast `applicationContext as Application` when instantiating the
+  factory.
+
+### UI Bug: BBPlayer Controls Hidden After Reset
+
+- **Problem**: Bilateral Beat Player controls would disappear from the UI after a "Reset to
+  Defaults" action.
+- **Cause**: `BeatDetector.resetPlayer()` was clearing the `selectedFileUri`. The UI uses the
+  presence of this URI to determine if the player card should be visible.
+- **Fix**: Modified `resetPlayer()` logic to preserve `selectedFileUri` and `selectedFileName` while
+  resetting playback state (progress, playing status, etc.).
+
+### Logic Bug: Heartbeat Session Fails to Start
+
+- **Problem**: The "Start Session" button would occasionally fail to trigger the heartbeat if a
+  BBPlayer track was previously paused.
+- **Cause**: Conflicting states between `BeatDetector` (paused) and `HapticManager` (starting).
+  Audio resources or internal flags were not being cleared correctly.
+- **Fix**: Added an explicit `BeatDetector.stopPlayback()` call at the entry point of
+  `HapticManager.startHeartbeatSession()` to ensure a clean slate.

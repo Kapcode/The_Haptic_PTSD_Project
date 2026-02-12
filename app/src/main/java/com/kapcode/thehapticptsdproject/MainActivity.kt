@@ -1,6 +1,8 @@
+@file:Suppress("unused")
 package com.kapcode.thehapticptsdproject
 
 import android.Manifest
+import android.app.Application
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -181,7 +183,8 @@ class MainActivity : ComponentActivity() {
             ) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val context = LocalContext.current
-                    val modesVm: ModesViewModel = viewModel(factory = ModesViewModelFactory(context.applicationContext))
+                    val modesVm: ModesViewModel =
+                        viewModel(factory = ModesViewModelFactory(context.applicationContext as Application))
                     MainScreenWithDrawer(playerVm, modesVm)
                 }
             }
@@ -295,7 +298,12 @@ fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel, modesVm: ModesViewModel)
                             )
 
                             Spacer(Modifier.height(8.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { SettingsManager.showOffsetSlider = !SettingsManager.showOffsetSlider; SettingsManager.save() }) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    SettingsManager.showOffsetSlider =
+                                        !SettingsManager.showOffsetSlider; SettingsManager.save()
+                                }) {
                                 AnimatedSwitch(checked = SettingsManager.showOffsetSlider, onCheckedChange = { SettingsManager.showOffsetSlider = it; SettingsManager.save() })
                                 Text("Show offset slider in player")
                             }
@@ -322,15 +330,30 @@ fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel, modesVm: ModesViewModel)
 
                     SectionCard(title = "Visualizer Customization") {
                         Column {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { SettingsManager.isBarsEnabled = !SettingsManager.isBarsEnabled; SettingsManager.save() }) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    SettingsManager.isBarsEnabled =
+                                        !SettingsManager.isBarsEnabled; SettingsManager.save()
+                                }) {
                                 AnimatedSwitch(checked = SettingsManager.isBarsEnabled, onCheckedChange = { SettingsManager.isBarsEnabled = it; SettingsManager.save() })
                                 Text("Vertical Bars (Frequencies)")
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { SettingsManager.isChannelIntensityEnabled = !SettingsManager.isChannelIntensityEnabled; SettingsManager.save() }) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    SettingsManager.isChannelIntensityEnabled =
+                                        !SettingsManager.isChannelIntensityEnabled; SettingsManager.save()
+                                }) {
                                 AnimatedSwitch(checked = SettingsManager.isChannelIntensityEnabled, onCheckedChange = { SettingsManager.isChannelIntensityEnabled = it; SettingsManager.save() })
                                 Text("Channel Intensity (Left/Right)")
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { SettingsManager.isWaveformEnabled = !SettingsManager.isWaveformEnabled; SettingsManager.save() }) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    SettingsManager.isWaveformEnabled =
+                                        !SettingsManager.isWaveformEnabled; SettingsManager.save()
+                                }) {
                                 AnimatedSwitch(checked = SettingsManager.isWaveformEnabled, onCheckedChange = { SettingsManager.isWaveformEnabled = it; SettingsManager.save() })
                                 Text("Waveform & Combo Elements")
                             }
@@ -368,7 +391,12 @@ fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel, modesVm: ModesViewModel)
                             )
 
                             Spacer(Modifier.height(8.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { SettingsManager.invertVisualizerAlpha = !SettingsManager.invertVisualizerAlpha; SettingsManager.save() }) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    SettingsManager.invertVisualizerAlpha =
+                                        !SettingsManager.invertVisualizerAlpha; SettingsManager.save()
+                                }) {
                                 AnimatedSwitch(checked = SettingsManager.invertVisualizerAlpha, onCheckedChange = { SettingsManager.invertVisualizerAlpha = it; SettingsManager.save() })
                                 Text("Invert Icon Alpha (Bright when triggered)")
                             }
@@ -481,7 +509,11 @@ fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel, modesVm: ModesViewModel)
                             .combinedClickable(
                                 onClick = {
                                     ApplicationHapticEffects.onButtonClick()
-                                    Toast.makeText(context, "Hold to reset all settings", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        "Hold to reset all settings",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 },
                                 onLongClick = {
                                     ApplicationHapticEffects.onLongPress()
