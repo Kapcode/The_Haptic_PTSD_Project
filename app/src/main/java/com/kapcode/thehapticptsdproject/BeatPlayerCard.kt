@@ -359,18 +359,16 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(Icons.Default.VolumeUp, "Volume", modifier = Modifier.padding(end = 8.dp), tint = Color.Gray)
                                             SliderWithTick(
-                                                value = SettingsManager.mediaVolume,
+                                                value = playerState.mediaVolume,
                                                 onValueChange = {
-                                                    SettingsManager.mediaVolume = it
-                                                    BeatDetector.syncPlaybackSettings()
-                                                    // No need to save here, as it's a live adjustment
+                                                    BeatDetector.updateMediaVolume(it)
                                                 },
                                                 valueRange = 0f..1f,
                                                 defaultValue = 0.9f,
                                                 modifier = Modifier.weight(1f)
                                             )
                                             Text(
-                                                text = "${(SettingsManager.mediaVolume * 100).toInt()}%",
+                                                text = "${(playerState.mediaVolume * 100).toInt()}%",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 modifier = Modifier.width(40.dp)
                                             )
@@ -378,14 +376,14 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(Icons.Default.Vibration, "Intensity", modifier = Modifier.padding(end = 8.dp), tint = Color.Gray)
                                             SliderWithTick(
-                                                value = SettingsManager.beatMaxIntensity,
-                                                onValueChange = { SettingsManager.beatMaxIntensity = it },
+                                                value = playerState.masterIntensity,
+                                                onValueChange = { BeatDetector.updateMasterIntensity(it) },
                                                 valueRange = 0f..1f,
                                                 defaultValue = 0.9f,
                                                 modifier = Modifier.weight(1f)
                                             )
                                             Text(
-                                                text = "${(SettingsManager.beatMaxIntensity * 100).toInt()}%",
+                                                text = "${(playerState.masterIntensity * 100).toInt()}%",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 modifier = Modifier.width(40.dp)
                                             )

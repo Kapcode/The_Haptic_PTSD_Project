@@ -16,6 +16,10 @@ class HapticControlViewModel : ViewModel() {
         SettingsManager.bpm = bpm
     }
 
+    fun onSessionDurationChange(seconds: Int) {
+        HapticManager.updateSessionDuration(seconds)
+    }
+
     fun onTestPulse() {
         HapticManager.testPulseSequence()
     }

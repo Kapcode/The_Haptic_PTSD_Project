@@ -392,6 +392,8 @@ object SettingsManager {
         snapScaleVibration = 0f
         snapScaleAudio = 0f
         snapDefaultValue = 0.05f
+
+        logToLogcat = false
         
         save()
     }

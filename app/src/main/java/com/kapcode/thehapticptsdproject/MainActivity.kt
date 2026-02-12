@@ -152,7 +152,9 @@ class MainActivity : ComponentActivity() {
                 )
             ) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    MainScreenWithDrawer(playerVm)
+                    val context = LocalContext.current
+                    val modesVm: ModesViewModel = viewModel(factory = ModesViewModelFactory(context.applicationContext))
+                    MainScreenWithDrawer(playerVm, modesVm)
                 }
             }
         }
@@ -165,7 +167,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel) {
+fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel, modesVm: ModesViewModel) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -181,6 +183,10 @@ fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel) {
                     onClick = {
                         ApplicationHapticEffects.onResetTriggered()
                         SettingsManager.resetToDefaults()
+                        HapticManager.reset()
+                        BeatDetector.resetPlayer()
+                        modesVm.resetModes()
+                        Logger.clear()
                         showResetDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -493,15 +499,13 @@ fun MainScreenWithDrawer(playerVm: BeatPlayerViewModel) {
                 )
             }
         ) { padding ->
-            MainScreen(modifier = Modifier.padding(padding), playerVm = playerVm)
+            MainScreen(modifier = Modifier.padding(padding), playerVm = playerVm, modesVm = modesVm)
         }
     }
 }
 
 @Composable
-fun MainScreen(modifier: Modifier = Modifier, playerVm: BeatPlayerViewModel) {
-    val context = LocalContext.current
-    val modesViewModel: ModesViewModel = viewModel(factory = ModesViewModelFactory(context.applicationContext))
+fun MainScreen(modifier: Modifier = Modifier, playerVm: BeatPlayerViewModel, modesVm: ModesViewModel) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -509,7 +513,7 @@ fun MainScreen(modifier: Modifier = Modifier, playerVm: BeatPlayerViewModel) {
     ) {
         Spacer(Modifier.height(8.dp))
 
-        ModesSection(viewModel = modesViewModel)
+        ModesSection(viewModel = modesVm)
         Spacer(Modifier.height(16.dp))
 
         HapticControlCard()

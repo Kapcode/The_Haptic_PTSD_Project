@@ -323,6 +323,13 @@ object HapticManager {
         )
     }
 
+    fun reset() {
+        _state.value = HapticState()
+        stopHeartbeatSession()
+        testJob?.cancel()
+        Logger.info("Haptic Manager state has been reset.")
+    }
+
     private fun sendIntentToService(action: String, extras: Intent.() -> Unit = {}) {
         if (!::context.isInitialized) return
         val intent = Intent(context, HapticService::class.java).apply {

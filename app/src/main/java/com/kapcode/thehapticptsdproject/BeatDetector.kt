@@ -574,7 +574,11 @@ object BeatDetector {
         HapticManager.resetIconAlphas()
         _playerState.update { it.copy(isPlaying = false, isPaused = false, currentTimestampMs = 0, nextBeatIndex = 0) }
     }
-
+    fun resetPlayer() {
+        stopPlayback()
+        _playerState.value = BeatPlayerState() // Reset to default state
+        Logger.info("BB Player state has been reset.")
+    }
     fun saveProfile(context: Context, parentTreeUri: Uri, audioFileName: String, profile: BeatProfile, beats: List<DetectedBeat>) {
         val hapticProfile = HapticProfile(audioFileName, profile.name, beats)
         val jsonString = Json.encodeToString(hapticProfile)

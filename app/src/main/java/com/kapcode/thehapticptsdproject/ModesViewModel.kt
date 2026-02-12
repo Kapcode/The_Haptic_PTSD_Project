@@ -22,6 +22,12 @@ class ModesViewModel(private val context: Context) : ViewModel() {
         updateHapticService()
     }
 
+    fun resetModes() {
+        modeState.value = ModeState(activeModes = emptySet())
+        updateHapticService()
+        Logger.info("UI: All modes reset to default.")
+    }
+
     private fun updateHapticService() {
         val intent = Intent(context, HapticService::class.java).apply {
             action = HapticService.ACTION_UPDATE_MODES
