@@ -6,6 +6,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -96,7 +97,7 @@ class BeatPlayerViewModel : ViewModel() {
     fun analyzeSelectedAudio(context: Context) {
         val uri = playerState.value.selectedFileUri
         val name = playerState.value.selectedFileName
-        val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
+        val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.toUri()
         
         if (uri != null && rootUri != null) {
             val intent = Intent(context, AnalysisService::class.java).apply {
@@ -116,7 +117,7 @@ class BeatPlayerViewModel : ViewModel() {
         val profile = selectedProfile.value
         
         if (uri != null && (uri != lastLoadedUri.value || profile != lastLoadedProfile.value)) {
-            val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.let { Uri.parse(it) }
+            val rootUri = folderUris.firstOrNull { uri.toString().startsWith(it) }?.toUri()
             if (rootUri != null) {
                 // This replaces the old beats, it does not add to them.
                 BeatDetector.loadMergedProfiles(context, uri, playerState.value.selectedFileName, rootUri)
@@ -148,7 +149,7 @@ class BeatPlayerViewModel : ViewModel() {
                 val lastUriStr = SettingsManager.lastPlayedAudioUri
                 val lastName = SettingsManager.lastPlayedAudioName
                 if (lastUriStr != null && lastName != null) {
-                    val lastUri = Uri.parse(lastUriStr)
+                    val lastUri = lastUriStr.toUri()
                     val root = folderUris.find { lastUriStr.startsWith(it) }
                     if (root != null) {
                         onFileSelected(lastUri, lastName)
@@ -158,7 +159,7 @@ class BeatPlayerViewModel : ViewModel() {
 
                 var bestFile: AnalysisFile? = null
                 for (folderUriStr in folderUris) {
-                    val folderUri = Uri.parse(folderUriStr)
+                    val folderUri = folderUriStr.toUri()
                     val files = getAudioFilesWithDetails(context, folderUri)
                     val analyzedFiles = files.filter { file ->
                         BeatDetector.findExistingProfile(context, folderUri, file.name, selectedProfile.value) != null
@@ -213,7 +214,7 @@ class BeatPlayerViewModel : ViewModel() {
                 val currentUri = playerState.value.selectedFileUri ?: return@launch
                 val rootUriStr = folderUris.firstOrNull { currentUri.toString().startsWith(it) }
                 if (rootUriStr != null) {
-                    val rootUri = Uri.parse(rootUriStr)
+                    val rootUri = rootUriStr.toUri()
                     files = withContext(Dispatchers.IO) { getAudioFiles(context, rootUri) }.sortedBy { it.first }
                     filesInExpandedFolder.value = files
                 }
@@ -239,7 +240,7 @@ class BeatPlayerViewModel : ViewModel() {
                 val currentUri = playerState.value.selectedFileUri ?: return@launch
                 val rootUriStr = folderUris.firstOrNull { currentUri.toString().startsWith(it) }
                 if (rootUriStr != null) {
-                    val rootUri = Uri.parse(rootUriStr)
+                    val rootUri = rootUriStr.toUri()
                     files = withContext(Dispatchers.IO) { getAudioFiles(context, rootUri) }.sortedBy { it.first }
                     filesInExpandedFolder.value = files
                 }

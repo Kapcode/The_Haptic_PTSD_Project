@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +32,7 @@ class BackgroundAnalysisViewModel : ViewModel() {
             withContext(Dispatchers.IO) {
                 val files = mutableListOf<AnalysisFile>()
                 folderUris.forEach { uriString ->
-                    val folderUri = Uri.parse(uriString)
+                    val folderUri = uriString.toUri()
                     files.addAll(getAudioFilesWithDetails(context, folderUri))
                 }
                 

@@ -9,6 +9,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.net.toUri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -94,9 +95,9 @@ class AnalysisService : Service() {
             return START_NOT_STICKY
         }
 
-        val fileUris = intent?.getStringArrayListExtra(EXTRA_FILE_URIS)?.map { Uri.parse(it) }
+        val fileUris = intent?.getStringArrayListExtra(EXTRA_FILE_URIS)?.map { it.toUri() }
         val fileNames = intent?.getStringArrayListExtra(EXTRA_FILE_NAMES)
-        val parentUris = intent?.getStringArrayListExtra(EXTRA_PARENT_URIS)?.map { Uri.parse(it) }
+        val parentUris = intent?.getStringArrayListExtra(EXTRA_PARENT_URIS)?.map { it.toUri() }
         val profileNames = intent?.getStringArrayListExtra(EXTRA_PROFILES)
 
         if (fileUris != null && fileNames != null && parentUris != null && profileNames != null) {
