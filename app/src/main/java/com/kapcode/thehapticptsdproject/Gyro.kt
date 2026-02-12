@@ -1,4 +1,3 @@
 package com.kapcode.thehapticptsdproject
 
-class Gyro {
-}
+class Gyro

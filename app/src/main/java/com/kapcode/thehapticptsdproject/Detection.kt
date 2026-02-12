@@ -1,4 +1,3 @@
 package com.kapcode.thehapticptsdproject
 
-class Detection {
-}
+class Detection

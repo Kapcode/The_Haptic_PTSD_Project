@@ -1,28 +1,59 @@
+
 package com.kapcode.thehapticptsdproject.composables
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowRight
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -34,15 +65,15 @@ import com.kapcode.thehapticptsdproject.HapticDevice
 import com.kapcode.thehapticptsdproject.HapticManager
 import com.kapcode.thehapticptsdproject.R
 import com.kapcode.thehapticptsdproject.SettingsManager
-import com.kapcode.thehapticptsdproject.VisualizerType
+import com.kapcode.thehapticptsdproject.animateWobble
+import com.kapcode.thehapticptsdproject.bouncyAnimationSpec
 import com.kapcode.thehapticptsdproject.getColor
 import com.kapcode.thehapticptsdproject.getIcon
-import kotlinx.coroutines.delay
 
 @Composable
 fun ExperimentalTag(modifier: Modifier = Modifier) {
     Surface(
-        color = Color(0xFFFFD700).copy(alpha = 0.15f), // Suttle Yellow
+        color = Color(0xFFFFD700).copy(alpha = 0.15f), // Subtle Yellow
         contentColor = Color(0xFFDAA520), // Darker Goldenrod for text
         shape = RoundedCornerShape(4.dp),
         modifier = modifier.padding(start = 8.dp)
@@ -63,17 +94,34 @@ fun ExperimentalTag(modifier: Modifier = Modifier) {
 fun SectionCard(
     title: String,
     isExperimental: Boolean = false,
+    isInitiallyExpanded: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp, horizontal = 16.dp)) {
+    var isExpanded by rememberSaveable { mutableStateOf(isInitiallyExpanded) }
+
+    Card(modifier = Modifier
+        .fillMaxWidth()
+        .padding(vertical = 4.dp, horizontal = 16.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    val rotationAngle by animateFloatAsState(
+                        targetValue = if (isExpanded) 90f else 0f,
+                        label = "arrowRotation"
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowRight,
+                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        modifier = Modifier.rotate(rotationAngle)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleLarge,
@@ -87,8 +135,12 @@ fun SectionCard(
                 }
                 Row { actions() }
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            content()
+            AnimatedVisibility(visible = isExpanded) {
+                Column {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    content()
+                }
+            }
         }
     }
 }
@@ -202,7 +254,7 @@ fun InPlayerAudioVisualizer(selectedProfile: BeatProfile? = null) {
                 if (SettingsManager.isWaveformEnabled) {
                     val animatedWaveAlpha by animateFloatAsState(
                         targetValue = 0.05f + (overallIntensity * 0.4f),
-                        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
+                        animationSpec = bouncyAnimationSpec,
                         label = "waveAlpha"
                     )
                     Box(
@@ -211,7 +263,10 @@ fun InPlayerAudioVisualizer(selectedProfile: BeatProfile? = null) {
                             .fillMaxHeight(0.5f)
                             .align(Alignment.Center)
                             .alpha(animatedWaveAlpha)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(50))
+                            .background(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                RoundedCornerShape(50)
+                            )
                     )
                     
                     Box(
@@ -227,9 +282,13 @@ fun InPlayerAudioVisualizer(selectedProfile: BeatProfile? = null) {
                 // 2. Bars and Indicators
                 Row(modifier = Modifier.fillMaxSize()) {
                     if (SettingsManager.isBarsEnabled) {
-                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        Column(modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()) {
                             // The Bars
-                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            Box(modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()) {
                                 // Threshold Lines Background
                                 Row(
                                     modifier = Modifier.fillMaxSize(),
@@ -239,11 +298,24 @@ fun InPlayerAudioVisualizer(selectedProfile: BeatProfile? = null) {
                                         val thresholds = getThresholdsForIndex(index)
                                         val threshold = thresholds.first
                                         val triggerThreshold = thresholds.second
-                                        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                                        Box(modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()) {
                                             if (threshold != null) {
-                                                Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(threshold).align(Alignment.BottomCenter).border(0.5.dp, Color.White.copy(alpha = 0.1f)))
+                                                Box(modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .fillMaxHeight(threshold)
+                                                    .align(Alignment.BottomCenter)
+                                                    .border(0.5.dp, Color.White.copy(alpha = 0.1f)))
                                                 if (triggerThreshold != null) {
-                                                    Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(triggerThreshold).align(Alignment.BottomCenter).border(0.5.dp, Color.Red.copy(alpha = 0.2f)))
+                                                    Box(modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .fillMaxHeight(triggerThreshold)
+                                                        .align(Alignment.BottomCenter)
+                                                        .border(
+                                                            0.5.dp,
+                                                            Color.Red.copy(alpha = 0.2f)
+                                                        ))
                                                 }
                                             }
                                         }
@@ -278,7 +350,10 @@ fun InPlayerAudioVisualizer(selectedProfile: BeatProfile? = null) {
                             
                             // Bottom Icon Indicators
                             Row(
-                                modifier = Modifier.fillMaxWidth().height(24.dp).padding(top = 4.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(24.dp)
+                                    .padding(top = 4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 val data = hState.visualizerData
@@ -298,7 +373,10 @@ fun InPlayerAudioVisualizer(selectedProfile: BeatProfile? = null) {
 
                     if (SettingsManager.isChannelIntensityEnabled) {
                         Column(
-                            modifier = Modifier.width(if (SettingsManager.isBarsEnabled) 80.dp else 240.dp).fillMaxHeight().padding(start = 8.dp),
+                            modifier = Modifier
+                                .width(if (SettingsManager.isBarsEnabled) 80.dp else 240.dp)
+                                .fillMaxHeight()
+                                .padding(start = 8.dp),
                             verticalArrangement = Arrangement.SpaceEvenly
                         ) {
                             val leftIntensity = if (hState.visualizerData.isNotEmpty()) hState.visualizerData[0] else 0f
@@ -331,6 +409,7 @@ private fun getThresholdsForIndex(index: Int): Pair<Float?, Float?> = when {
 }
 
 @Composable
+
 fun ProfileIndicatorIcon(profile: BeatProfile, isVisualizerTriggered: Boolean, isSelected: Boolean, modifier: Modifier = Modifier) {
     val hState by HapticManager.state.collectAsState()
     
@@ -341,18 +420,11 @@ fun ProfileIndicatorIcon(profile: BeatProfile, isVisualizerTriggered: Boolean, i
     val animatedAlpha by animateFloatAsState(targetValue = targetAlpha, label = "iconAlpha")
 
     // Wobble animation
-    val infiniteTransition = rememberInfiniteTransition(label = "wobble")
-    val wobbleAngle by infiniteTransition.animateFloat(
-        initialValue = -10f,
-        targetValue = 10f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(150, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "wobbleAngle"
-    )
+    val wobbleAngle by animateWobble()
 
-    Box(modifier = modifier.fillMaxHeight().background(profile.getColor().copy(alpha = 0.05f), RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
+    Box(modifier = modifier
+        .fillMaxHeight()
+        .background(profile.getColor().copy(alpha = 0.05f), RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
         Icon(
             imageVector = profile.getIcon(),
             contentDescription = null,
@@ -369,7 +441,9 @@ fun ProfileIndicatorIcon(profile: BeatProfile, isVisualizerTriggered: Boolean, i
                 }
         )
         if (isSelected) {
-            Box(Modifier.fillMaxSize().border(1.dp, profile.getColor().copy(alpha = 0.5f), RoundedCornerShape(4.dp)))
+            Box(Modifier
+                .fillMaxSize()
+                .border(1.dp, profile.getColor().copy(alpha = 0.5f), RoundedCornerShape(4.dp)))
         }
     }
 }
@@ -379,18 +453,21 @@ fun VisualizerBar(intensity: Float, color: Color, alpha: Float, modifier: Modifi
     val minHeight = 0.05f
     val animatedHeight by animateFloatAsState(
         targetValue = intensity.coerceIn(minHeight, 1f),
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
+        animationSpec = bouncyAnimationSpec,
         label = "barHeight"
     )
     val animatedAlpha by animateFloatAsState(
         targetValue = alpha,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
+        animationSpec = bouncyAnimationSpec,
         label = "barAlpha"
     )
     Box(
         modifier = modifier
             .fillMaxHeight(animatedHeight)
-            .background(color.copy(alpha = animatedAlpha), RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+            .background(
+                color.copy(alpha = animatedAlpha),
+                RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)
+            )
     )
 }
 
@@ -423,8 +500,8 @@ fun VisualizerIcon(onRes: Int, offRes: Int, intensity: Float, activeColor: Color
     val animatedIntensity by animateFloatAsState(targetValue = intensity, label = "iconIntensity")
     val isActive = animatedIntensity > 0.01f
     val alpha = (SettingsManager.minIconAlpha + (animatedIntensity * (1.0f - SettingsManager.minIconAlpha))).coerceIn(0f, 1f)
-    
-    val themePrimary = MaterialTheme.colorScheme.primary
+
+    MaterialTheme.colorScheme.primary
     val color = if (isActive) activeColor else Color.Gray
     
     // DEVICE WOBBLE Logic: Wobble if any profile assigned to this device is actively vibrating
@@ -436,18 +513,11 @@ fun VisualizerIcon(onRes: Int, offRes: Int, intensity: Float, activeColor: Color
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "deviceWobble")
-    val wobbleAngle by infiniteTransition.animateFloat(
-        initialValue = -8f,
-        targetValue = 8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(120, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "deviceWobbleAngle"
-    )
+    val wobbleAngle by animateWobble(initialValue = -8f, targetValue = 8f, durationMillis = 120)
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(60.dp).clickable { onClick() }) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier
+        .width(60.dp)
+        .clickable { onClick() }) {
         Box(
             modifier = Modifier
                 .size(size)

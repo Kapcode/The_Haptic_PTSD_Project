@@ -2,30 +2,31 @@ package com.kapcode.thehapticptsdproject
 
 import android.content.Context
 import android.media.AudioAttributes
-import android.media.MediaPlayer
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.media.MediaPlayer
 import android.media.audiofx.Visualizer
 import android.net.Uri
-import android.os.Build
 import android.provider.DocumentsContract
-import androidx.annotation.RequiresApi
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jtransforms.fft.DoubleFFT_1D
-import java.io.InputStream
 import java.nio.charset.Charset
 import java.util.Scanner
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
-import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
@@ -126,12 +127,11 @@ object BeatDetector {
         mediaPlayer?.let { mp ->
             val vol = (_playerState.value.mediaVolume * SettingsManager.volumeBoost).coerceIn(0f, 1f)
             mp.setVolume(vol, vol)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                try {
-                    val params = mp.playbackParams
-                    params.speed = SettingsManager.playbackSpeed
-                    mp.playbackParams = params
-                } catch (e: Exception) { }
+            try {
+                val params = mp.playbackParams
+                params.speed = SettingsManager.playbackSpeed
+                mp.playbackParams = params
+            } catch (e: Exception) {
             }
         }
     }
@@ -575,8 +575,14 @@ object BeatDetector {
         _playerState.update { it.copy(isPlaying = false, isPaused = false, currentTimestampMs = 0, nextBeatIndex = 0) }
     }
     fun resetPlayer() {
+        // Keep the currently selected file info after the reset.
+        val currentUri = _playerState.value.selectedFileUri
+        val currentName = _playerState.value.selectedFileName
         stopPlayback()
-        _playerState.value = BeatPlayerState() // Reset to default state
+        _playerState.value = BeatPlayerState(
+            selectedFileUri = currentUri,
+            selectedFileName = currentName
+        )
         Logger.info("BB Player state has been reset.")
     }
     fun saveProfile(context: Context, parentTreeUri: Uri, audioFileName: String, profile: BeatProfile, beats: List<DetectedBeat>) {

@@ -3,9 +3,10 @@ package com.kapcode.thehapticptsdproject
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -30,42 +31,52 @@ object SettingsManager {
 
     // Squeeze Settings
     var isSqueezeEnabled by mutableStateOf(false)
-    var squeezeThreshold by mutableStateOf(0.50f)
+    var squeezeThreshold by mutableFloatStateOf(0.50f)
 
     // Shake Settings
     var isShakeEnabled by mutableStateOf(true)
-    var internalShakeThreshold by mutableStateOf(15f)
+    var internalShakeThreshold by mutableFloatStateOf(15f)
 
     // Haptic Settings
-    var intensity by mutableStateOf(0.5f)
-    var bpm by mutableStateOf(60)
-    var sessionDurationSeconds by mutableStateOf(120)
-    var hapticLeadInMs by mutableStateOf(10)
-    var hapticLeadOutMs by mutableStateOf(10)
-    var hapticSyncOffsetMs by mutableStateOf(-1500)
+    var intensity by mutableFloatStateOf(0.5f)
+    var bpm by mutableIntStateOf(60)
+    var sessionDurationSeconds by mutableIntStateOf(120)
+    var hapticLeadInMs by mutableIntStateOf(10)
+    var hapticLeadOutMs by mutableIntStateOf(10)
+    var hapticSyncOffsetMs by mutableIntStateOf(-1500)
 
     // Beat Player Settings
     var isLiveHapticsEnabled by mutableStateOf(false)
-    var beatMaxIntensity by mutableStateOf(1.0f)
-    var mediaVolume by mutableStateOf(1.0f)
+    var beatMaxIntensity by mutableFloatStateOf(1.0f)
+    var mediaVolume by mutableFloatStateOf(1.0f)
     var lastPlayedAudioUri by mutableStateOf<String?>(null)
     var lastPlayedAudioName by mutableStateOf<String?>(null)
     var showOffsetSlider by mutableStateOf(false)
-    var seekbarTimeWindowMinutes by mutableStateOf(5)
-    var seekThumbWidth by mutableStateOf(12f)
-    var seekThumbHeight by mutableStateOf(48f)
-    var seekThumbAlpha by mutableStateOf(0.85f)
+    var seekbarTimeWindowMinutes by mutableIntStateOf(5)
+    var seekThumbWidth by mutableFloatStateOf(12f)
+    var seekThumbHeight by mutableFloatStateOf(48f)
+    var seekThumbAlpha by mutableFloatStateOf(0.85f)
     
     var isRepeatEnabled by mutableStateOf(false)
     var isRepeatAllEnabled by mutableStateOf(false)
-    var volumeBoost by mutableStateOf(1.0f)
-    var playbackSpeed by mutableStateOf(1.0f)
+    var volumeBoost by mutableFloatStateOf(1.0f)
+    var playbackSpeed by mutableFloatStateOf(1.0f)
+    var beatPlayerComponentOrder by mutableStateOf(
+        listOf(
+            "Haptic",
+            "Audio",
+            "Progress",
+            "Controls1",
+            "Controls2",
+            "Controls3"
+        )
+    )
 
     // Live Haptic Settings
-    var liveCooldownAmplitudeMs by mutableStateOf(200)
-    var liveCooldownBassMs by mutableStateOf(400)
-    var liveCooldownDrumMs by mutableStateOf(150)
-    var liveCooldownGuitarMs by mutableStateOf(200)
+    var liveCooldownAmplitudeMs by mutableIntStateOf(200)
+    var liveCooldownBassMs by mutableIntStateOf(400)
+    var liveCooldownDrumMs by mutableIntStateOf(150)
+    var liveCooldownGuitarMs by mutableIntStateOf(200)
 
     // Device Assignments: Device -> Set of Profiles
     var deviceAssignments by mutableStateOf<Map<HapticDevice, Set<BeatProfile>>>(
@@ -77,51 +88,51 @@ object SettingsManager {
     var isChannelIntensityEnabled by mutableStateOf(false)
     var isWaveformEnabled by mutableStateOf(false)
 
-    var gainAmplitude by mutableStateOf(12f)
-    var gainBass by mutableStateOf(2.5f)
-    var gainDrum by mutableStateOf(2.2f)
-    var gainGuitar by mutableStateOf(1.8f)
-    var gainHighs by mutableStateOf(1.5f)
-    var visualizerTriggeredAlpha by mutableStateOf(0.1f)
-    var minIconAlpha by mutableStateOf(0.2f)
-    var latchDurationMs by mutableStateOf(200)
+    var gainAmplitude by mutableFloatStateOf(12f)
+    var gainBass by mutableFloatStateOf(2.5f)
+    var gainDrum by mutableFloatStateOf(2.2f)
+    var gainGuitar by mutableFloatStateOf(1.8f)
+    var gainHighs by mutableFloatStateOf(1.5f)
+    var visualizerTriggeredAlpha by mutableFloatStateOf(0.1f)
+    var minIconAlpha by mutableFloatStateOf(0.2f)
+    var latchDurationMs by mutableIntStateOf(200)
     var invertVisualizerAlpha by mutableStateOf(false)
-    var triggerThresholdAmplitude by mutableStateOf(0.38f)
-    var triggerThresholdBass by mutableStateOf(0.48f)
-    var triggerThresholdDrum by mutableStateOf(0.48f)
-    var triggerThresholdGuitar by mutableStateOf(0.48f)
-    var scaleVibrationVisualizerX by mutableStateOf(1.0f)
-    var scaleVibrationVisualizerY by mutableStateOf(1.0f)
-    var scaleAudioVisualizerX by mutableStateOf(1.0f)
-    var scaleAudioVisualizerY by mutableStateOf(1.0f)
+    var triggerThresholdAmplitude by mutableFloatStateOf(0.38f)
+    var triggerThresholdBass by mutableFloatStateOf(0.48f)
+    var triggerThresholdDrum by mutableFloatStateOf(0.48f)
+    var triggerThresholdGuitar by mutableFloatStateOf(0.48f)
+    var scaleVibrationVisualizerX by mutableFloatStateOf(1.0f)
+    var scaleVibrationVisualizerY by mutableFloatStateOf(1.0f)
+    var scaleAudioVisualizerX by mutableFloatStateOf(1.0f)
+    var scaleAudioVisualizerY by mutableFloatStateOf(1.0f)
 
     // Accessibility Settings (Font Sizes)
-    var fontSizeRegular by mutableStateOf(14f)
-    var fontSizeCardTitle by mutableStateOf(18f)
-    var fontSizeButton by mutableStateOf(14f)
-    var fontSizeCardNotation by mutableStateOf(12f)
-    var fontSizeCardHeading by mutableStateOf(22f)
+    var fontSizeRegular by mutableFloatStateOf(14f)
+    var fontSizeCardTitle by mutableFloatStateOf(18f)
+    var fontSizeButton by mutableFloatStateOf(14f)
+    var fontSizeCardNotation by mutableFloatStateOf(12f)
+    var fontSizeCardHeading by mutableFloatStateOf(22f)
 
     // Experimental Switch
     var isExperimentalEnabled by mutableStateOf(false)
 
     // Snap Settings
-    var snapIntensity by mutableStateOf(0f)
-    var snapBpm by mutableStateOf(0f)
-    var snapDuration by mutableStateOf(0f)
-    var snapVolume by mutableStateOf(0f)
-    var snapBeatMaxIntensity by mutableStateOf(0f)
-    var snapSqueeze by mutableStateOf(0f)
-    var snapShake by mutableStateOf(0f)
-    var snapGain by mutableStateOf(0f)
-    var snapTriggeredAlpha by mutableStateOf(0f)
-    var snapIconAlpha by mutableStateOf(0f)
-    var snapSyncOffset by mutableStateOf(0f)
-    var snapLatchDuration by mutableStateOf(0f)
-    var snapTriggerThreshold by mutableStateOf(0f)
-    var snapScaleVibration by mutableStateOf(0f)
-    var snapScaleAudio by mutableStateOf(0f)
-    var snapDefaultValue by mutableStateOf(0.05f)
+    var snapIntensity by mutableFloatStateOf(0f)
+    var snapBpm by mutableFloatStateOf(0f)
+    var snapDuration by mutableFloatStateOf(0f)
+    var snapVolume by mutableFloatStateOf(0f)
+    var snapBeatMaxIntensity by mutableFloatStateOf(0f)
+    var snapSqueeze by mutableFloatStateOf(0f)
+    var snapShake by mutableFloatStateOf(0f)
+    var snapGain by mutableFloatStateOf(0f)
+    var snapTriggeredAlpha by mutableFloatStateOf(0f)
+    var snapIconAlpha by mutableFloatStateOf(0f)
+    var snapSyncOffset by mutableFloatStateOf(0f)
+    var snapLatchDuration by mutableFloatStateOf(0f)
+    var snapTriggerThreshold by mutableFloatStateOf(0f)
+    var snapScaleVibration by mutableFloatStateOf(0f)
+    var snapScaleAudio by mutableFloatStateOf(0f)
+    var snapDefaultValue by mutableFloatStateOf(0.05f)
 
 
     // Logging
@@ -159,7 +170,16 @@ object SettingsManager {
         isRepeatAllEnabled = prefs.getBoolean("is_repeat_all_enabled", false)
         volumeBoost = prefs.getFloat("volume_boost", 1.0f)
         playbackSpeed = prefs.getFloat("playback_speed", 1.0f)
-        
+
+        val orderJson = prefs.getString("beat_player_component_order", null)
+        if (orderJson != null) {
+            try {
+                beatPlayerComponentOrder = Json.decodeFromString(orderJson)
+            } catch (e: Exception) {
+                // Default already set
+            }
+        }
+
         liveCooldownAmplitudeMs = prefs.getInt("live_cooldown_amplitude", 200)
         liveCooldownBassMs = prefs.getInt("live_cooldown_bass", 400)
         liveCooldownDrumMs = prefs.getInt("live_cooldown_drum", 150)
@@ -253,6 +273,7 @@ object SettingsManager {
             putBoolean("is_repeat_all_enabled", isRepeatAllEnabled)
             putFloat("volume_boost", volumeBoost)
             putFloat("playback_speed", playbackSpeed)
+            putString("beat_player_component_order", Json.encodeToString(beatPlayerComponentOrder))
             
             putInt("live_cooldown_amplitude", liveCooldownAmplitudeMs)
             putInt("live_cooldown_bass", liveCooldownBassMs)
@@ -338,6 +359,8 @@ object SettingsManager {
         isRepeatAllEnabled = false
         volumeBoost = 1.0f
         playbackSpeed = 1.0f
+        beatPlayerComponentOrder =
+            listOf("Haptic", "Audio", "Progress", "Controls1", "Controls2", "Controls3")
 
         liveCooldownAmplitudeMs = 200
         liveCooldownBassMs = 400

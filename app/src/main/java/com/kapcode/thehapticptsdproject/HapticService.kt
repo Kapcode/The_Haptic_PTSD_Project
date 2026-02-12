@@ -5,13 +5,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.os.VibrationEffect
@@ -19,12 +17,17 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.View
 import android.widget.RemoteViews
-import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlin.math.sqrt
-import com.kapcode.thehapticptsdproject.Logger
 
 /**
  * A foreground service responsible for managing all background operations.
@@ -79,16 +82,15 @@ class HapticService : Service(), SensorEventListener {
         const val EXTRA_AMPLITUDE = "EXTRA_AMPLITUDE"
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate() {
         super.onCreate()
         SettingsManager.init(this)
         HapticManager.init(this)
 
-        val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+        val vibratorManager = getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
         vibrator = vibratorManager.defaultVibrator
 
-        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
 
         SqueezeManager.setOnSqueezeListener {
@@ -129,7 +131,6 @@ class HapticService : Service(), SensorEventListener {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
@@ -179,7 +180,6 @@ class HapticService : Service(), SensorEventListener {
         return START_STICKY
     }
     
-    @RequiresApi(Build.VERSION_CODES.O)
     private fun playVibration(durationMs: Long, amplitude: Int) {
         if (vibrator?.hasVibrator() == true) {
             vibrator?.vibrate(VibrationEffect.createOneShot(durationMs, amplitude))
@@ -300,7 +300,7 @@ class HapticService : Service(), SensorEventListener {
 
     private fun acquireWakeLock() {
         if (wakeLock == null) {
-            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val powerManager = getSystemService(POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "HapticProject::DetectionWakeLock")
         }
         if (wakeLock?.isHeld == false) {
@@ -317,7 +317,6 @@ class HapticService : Service(), SensorEventListener {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     private fun triggerHaptics(source: String) {
         val playerState = BeatDetector.playerState.value
         if (playerState.isPlaying || playerState.isPaused) {

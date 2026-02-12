@@ -1,19 +1,75 @@
 package com.kapcode.thehapticptsdproject
 
-import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Forward30
+import androidx.compose.material.icons.filled.Forward5
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PauseCircle
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Replay30
+import androidx.compose.material.icons.filled.Replay5
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Speaker
+import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -24,12 +80,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kapcode.thehapticptsdproject.composables.AnimatedSwitch
 import com.kapcode.thehapticptsdproject.composables.FileItem
 import com.kapcode.thehapticptsdproject.composables.FolderItem
-import com.kapcode.thehapticptsdproject.composables.InPlayerHapticVisualizer
 import com.kapcode.thehapticptsdproject.composables.InPlayerAudioVisualizer
+import com.kapcode.thehapticptsdproject.composables.InPlayerHapticVisualizer
 import com.kapcode.thehapticptsdproject.composables.SectionCard
 import com.kapcode.thehapticptsdproject.composables.SliderWithTick
 
@@ -47,7 +104,7 @@ fun BeatProfile.getIcon(): ImageVector = when(this) {
     BeatProfile.GUITAR -> Icons.Default.MusicNote
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
     val context = LocalContext.current
@@ -59,8 +116,8 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
     val showAnalysisDialog by vm.showAnalysisDialog
     val triggerNext by vm.triggerNext
 
-    // Layout Management
-    var componentOrder by remember { mutableStateOf(listOf("Haptic", "Audio", "Progress", "Controls1", "Controls2", "Controls3")) }
+    // Layout Management - Linked to SettingsManager
+    val componentOrder = SettingsManager.beatPlayerComponentOrder
     
     // Animation for reorder button cue
     val infiniteTransition = rememberInfiniteTransition(label = "flash")
@@ -103,9 +160,14 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
 
     SectionCard(
         title = "Bilateral Beat Player",
+        isInitiallyExpanded = true,
         actions = {
             IconButton(
-                onClick = { componentOrder = componentOrder.drop(1) + componentOrder.take(1) },
+                onClick = {
+                    val newOrder = componentOrder.drop(1) + componentOrder.take(1)
+                    SettingsManager.beatPlayerComponentOrder = newOrder
+                    SettingsManager.save()
+                },
                 modifier = Modifier.scale(reorderScale)
             ) {
                 Icon(Icons.Default.DragHandle, contentDescription = "Cycle Layout", tint = MaterialTheme.colorScheme.primary)
@@ -114,7 +176,7 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
     ) {
         Column {
             for (uriString in folderUris) {
-                val folderUri = Uri.parse(uriString)
+                val folderUri = uriString.toUri()
                 val isExpanded = expandedFolderUri == folderUri
                 FolderItem(folderUri, isExpanded) { vm.onFolderExpanded(folderUri) }
                 AnimatedVisibility(visible = isExpanded) {
@@ -228,171 +290,380 @@ fun BeatPlayerCard(vm: BeatPlayerViewModel = viewModel()) {
 
             // Show player controls once a file is selected.
             if (playerState.selectedFileUri != null) {
-                Column {
-                    componentOrder.forEach { type ->
-                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                            IconButton(onClick = { 
-                                Toast.makeText(context, "Tap the pulsing Drag Handle in the top corner to cycle layout order.", Toast.LENGTH_SHORT).show()
-                            }) {
-                                Icon(Icons.Default.DragHandle, null, tint = Color.Gray.copy(alpha = 0.5f))
-                            }
-                            
-                            Box(modifier = Modifier.weight(1f)) {
-                                when(type) {
-                                    "Haptic" -> InPlayerHapticVisualizer(selectedProfile = selectedProfile)
-                                    "Audio" -> InPlayerAudioVisualizer(selectedProfile = selectedProfile)
-                                    "Progress" -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        val currentSecs = playerState.currentTimestampMs / 1000
-                                        val totalSecs = playerState.totalDurationMs / 1000
-                                        Text("${currentSecs / 60}:${(currentSecs % 60).toString().padStart(2, '0')} / ${totalSecs / 60}:${(totalSecs % 60).toString().padStart(2, '0')}", style = MaterialTheme.typography.bodySmall)
+                Box(modifier = Modifier.heightIn(max = 1200.dp)) {
+                    LazyColumn(modifier = Modifier.animateContentSize()) {
+                        items(componentOrder, key = { it }) { type ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                IconButton(onClick = {
+                                    Toast.makeText(
+                                        context,
+                                        "Tap the pulsing Drag Handle in the top corner to cycle layout order.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }) {
+                                    Icon(
+                                        Icons.Default.DragHandle,
+                                        null,
+                                        tint = Color.Gray.copy(alpha = 0.5f)
+                                    )
+                                }
 
-                                        BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(64.dp)) {
-                                            val containerWidth = maxWidth
-                                            val density = LocalDensity.current
-                                            val totalMs = playerState.totalDurationMs.coerceAtLeast(1L)
-                                            val windowMs = SettingsManager.seekbarTimeWindowMinutes * 60 * 1000L
-                                            val scaleFactor = if (totalMs > windowMs) totalMs.toFloat() / windowMs.toFloat() else 1.0f
-                                            val contentWidth = containerWidth * scaleFactor
-                                            val scrollState = rememberScrollState()
-                                            
-                                            LaunchedEffect(playerState.currentTimestampMs, scaleFactor) {
-                                                if (playerState.isPlaying && scaleFactor > 1.0f) {
-                                                    val contentWidthPx = with(density) { contentWidth.toPx() }
-                                                    val containerWidthPx = with(density) { containerWidth.toPx() }
-                                                    val progress = playerState.currentTimestampMs.toFloat() / totalMs.toFloat()
-                                                    val cursorX = progress * contentWidthPx
-                                                    val targetScroll = (cursorX - (containerWidthPx * 0.2f)).toInt()
-                                                    val maxScroll = (contentWidthPx - containerWidthPx).toInt()
-                                                    scrollState.scrollTo(targetScroll.coerceIn(0, maxScroll))
+                                Box(modifier = Modifier.weight(1f)) {
+                                    when (type) {
+                                        "Haptic" -> InPlayerHapticVisualizer(selectedProfile = selectedProfile)
+                                        "Audio" -> InPlayerAudioVisualizer(selectedProfile = selectedProfile)
+                                        "Progress" -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            val currentSecs = playerState.currentTimestampMs / 1000
+                                            val totalSecs = playerState.totalDurationMs / 1000
+                                            Text(
+                                                "${currentSecs / 60}:${
+                                                    (currentSecs % 60).toString().padStart(2, '0')
+                                                } / ${totalSecs / 60}:${
+                                                    (totalSecs % 60).toString().padStart(2, '0')
+                                                }", style = MaterialTheme.typography.bodySmall
+                                            )
+
+                                            BoxWithConstraints(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(64.dp)
+                                            ) {
+                                                val containerWidth = maxWidth
+                                                val density = LocalDensity.current
+                                                val totalMs =
+                                                    playerState.totalDurationMs.coerceAtLeast(1L)
+                                                val windowMs =
+                                                    SettingsManager.seekbarTimeWindowMinutes * 60 * 1000L
+
+                                                val scaleFactor =
+                                                    if (totalMs > windowMs) totalMs.toFloat() / windowMs.toFloat() else 1.0f
+                                                val contentWidth = containerWidth * scaleFactor
+                                                val scrollState = rememberScrollState()
+
+                                                LaunchedEffect(
+                                                    playerState.currentTimestampMs,
+                                                    scaleFactor
+                                                ) {
+                                                    if (playerState.isPlaying && scaleFactor > 1.0f) {
+                                                        val contentWidthPx =
+                                                            with(density) { contentWidth.toPx() }
+                                                        val containerWidthPx =
+                                                            with(density) { containerWidth.toPx() }
+                                                        val progress =
+                                                            playerState.currentTimestampMs.toFloat() / totalMs.toFloat()
+                                                        val cursorX = progress * contentWidthPx
+                                                        val targetScroll =
+                                                            (cursorX - (containerWidthPx * 0.2f)).toInt()
+                                                        val maxScroll =
+                                                            (contentWidthPx - containerWidthPx).toInt()
+                                                        scrollState.scrollTo(
+                                                            targetScroll.coerceIn(
+                                                                0,
+                                                                maxScroll
+                                                            )
+                                                        )
+                                                    }
                                                 }
-                                            }
 
-                                            Box(modifier = Modifier.fillMaxSize().horizontalScroll(scrollState, enabled = scaleFactor > 1.0f)) {
-                                                Box(modifier = Modifier.width(contentWidth).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                                                    val assignedProfiles = remember(SettingsManager.deviceAssignments) { SettingsManager.deviceAssignments.values.flatten().toSet() }
-                                                    Canvas(modifier = Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 10.dp)) {
-                                                        val canvasWidth = size.width
-                                                        val totalDuration = playerState.totalDurationMs.toFloat().coerceAtLeast(1f)
-                                                        if (!SettingsManager.isLiveHapticsEnabled) {
-                                                            playerState.detectedBeats.forEach { beat ->
-                                                                if (beat.profile in assignedProfiles) {
-                                                                    val x = (beat.timestampMs.toFloat() / totalDuration) * canvasWidth
-                                                                    val shadowWidth = 2.dp.toPx()
-                                                                    drawLine(color = beat.profile.getColor().copy(alpha = 0.2f), start = androidx.compose.ui.geometry.Offset(x - shadowWidth, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = shadowWidth)
-                                                                    drawLine(color = beat.profile.getColor().copy(alpha = 0.6f), start = androidx.compose.ui.geometry.Offset(x, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1.dp.toPx())
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .horizontalScroll(
+                                                            scrollState,
+                                                            enabled = scaleFactor > 1.0f
+                                                        )
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .width(contentWidth)
+                                                            .fillMaxHeight(),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        val assignedProfiles =
+                                                            remember(SettingsManager.deviceAssignments) {
+                                                                SettingsManager.deviceAssignments.values.flatten()
+                                                                    .toSet()
+                                                            }
+                                                        Canvas(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .height(32.dp)
+                                                                .padding(horizontal = 10.dp)
+                                                        ) {
+                                                            val canvasWidth = size.width
+                                                            val totalDuration =
+                                                                playerState.totalDurationMs.toFloat()
+                                                                    .coerceAtLeast(1f)
+                                                            if (!SettingsManager.isLiveHapticsEnabled) {
+                                                                playerState.detectedBeats.forEach { beat ->
+                                                                    if (beat.profile in assignedProfiles) {
+                                                                        val x =
+                                                                            (beat.timestampMs.toFloat() / totalDuration) * canvasWidth
+                                                                        val shadowWidth =
+                                                                            2.dp.toPx()
+                                                                        drawLine(
+                                                                            color = beat.profile.getColor()
+                                                                                .copy(alpha = 0.2f),
+                                                                            start = androidx.compose.ui.geometry.Offset(
+                                                                                x - shadowWidth,
+                                                                                0f
+                                                                            ),
+                                                                            end = androidx.compose.ui.geometry.Offset(
+                                                                                x,
+                                                                                size.height
+                                                                            ),
+                                                                            strokeWidth = shadowWidth
+                                                                        )
+                                                                        drawLine(
+                                                                            color = beat.profile.getColor()
+                                                                                .copy(alpha = 0.6f),
+                                                                            start = androidx.compose.ui.geometry.Offset(
+                                                                                x,
+                                                                                0f
+                                                                            ),
+                                                                            end = androidx.compose.ui.geometry.Offset(
+                                                                                x,
+                                                                                size.height
+                                                                            ),
+                                                                            strokeWidth = 1.dp.toPx()
+                                                                        )
+                                                                    }
                                                                 }
                                                             }
                                                         }
+                                                        Slider(
+                                                            value = playerState.currentTimestampMs.toFloat(),
+                                                            onValueChange = { BeatDetector.seekTo(it.toLong()) },
+                                                            valueRange = 0f..playerState.totalDurationMs.toFloat()
+                                                                .coerceAtLeast(1f),
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            thumb = {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .width(
+                                                                            SettingsManager.seekThumbWidth.dp
+                                                                        )
+                                                                        .height(SettingsManager.seekThumbHeight.dp)
+                                                                        .alpha(SettingsManager.seekThumbAlpha)
+                                                                        .background(
+                                                                            MaterialTheme.colorScheme.primary,
+                                                                            RoundedCornerShape(4.dp)
+                                                                        )
+                                                                )
+                                                            },
+                                                            colors = SliderDefaults.colors(
+                                                                activeTrackColor = Color.Transparent,
+                                                                inactiveTrackColor = Color.Transparent
+                                                            )
+                                                        )
                                                     }
-                                                    Slider(
-                                                        value = playerState.currentTimestampMs.toFloat(),
-                                                        onValueChange = { BeatDetector.seekTo(it.toLong()) },
-                                                        valueRange = 0f..playerState.totalDurationMs.toFloat().coerceAtLeast(1f),
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        thumb = {
-                                                            Box(modifier = Modifier.width(SettingsManager.seekThumbWidth.dp).height(SettingsManager.seekThumbHeight.dp).alpha(SettingsManager.seekThumbAlpha).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp)))
-                                                        },
-                                                        colors = SliderDefaults.colors(activeTrackColor = Color.Transparent, inactiveTrackColor = Color.Transparent)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                    "Controls1" -> Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                                        IconButton(onClick = { vm.skipBackward(30) }) { Icon(Icons.Default.Replay30, "Skip -30s") }
-                                        IconButton(onClick = { vm.skipBackward(5) }) { Icon(Icons.Default.Replay5, "Skip -5s") }
-                                        if (playerState.isPlaying) { IconButton(onClick = { vm.pause() }) { Icon(Icons.Default.PauseCircle, "Pause", Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary) } }
-                                        else { IconButton(onClick = { vm.play(context) }) { Icon(Icons.Default.PlayCircle, "Play", Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary) } }
-                                        IconButton(onClick = { vm.skipForward(5) }) { Icon(Icons.Default.Forward5, "Skip +5s") }
-                                        IconButton(onClick = { vm.skipForward(30) }) { Icon(Icons.Default.Forward30, "Skip +30s") }
-                                    }
-                                    "Controls2" -> Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                                        IconButton(onClick = { vm.previousTrack(context) }) { Icon(Icons.Default.SkipPrevious, "Prev") }
-                                        IconButton(onClick = {
-                                            val toastText = if (!SettingsManager.isRepeatEnabled && !SettingsManager.isRepeatAllEnabled) {
-                                                SettingsManager.isRepeatAllEnabled = true
-                                                "Repeat All Enabled"
-                                            } else if (SettingsManager.isRepeatAllEnabled) {
-                                                SettingsManager.isRepeatAllEnabled = false
-                                                SettingsManager.isRepeatEnabled = true
-                                                "Repeat One Enabled"
-                                            } else {
-                                                SettingsManager.isRepeatEnabled = false
-                                                SettingsManager.isRepeatAllEnabled = false
-                                                "Repeat Disabled"
-                                            }
-                                            Toast.makeText(context, toastText, Toast.LENGTH_SHORT).show()
-                                            SettingsManager.save()
-                                        }) { 
-                                            val icon = if (SettingsManager.isRepeatEnabled) Icons.Default.RepeatOne else Icons.Default.Repeat
-                                            val tint = if (SettingsManager.isRepeatEnabled || SettingsManager.isRepeatAllEnabled) MaterialTheme.colorScheme.primary else Color.Gray
-                                            Icon(icon, "Repeat", tint = tint)
-                                        }
-                                        
-                                        var speedExpanded by remember { mutableStateOf(false) }
-                                        Box {
-                                            TextButton(onClick = { speedExpanded = true }) {
-                                                Text("${SettingsManager.playbackSpeed}x", fontSize = 12.sp)
-                                            }
-                                            DropdownMenu(expanded = speedExpanded, onDismissRequest = { speedExpanded = false }) {
-                                                listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
-                                                    DropdownMenuItem(text = { Text("${speed}x") }, onClick = { 
-                                                        SettingsManager.playbackSpeed = speed
-                                                        SettingsManager.save()
-                                                        BeatDetector.syncPlaybackSettings()
-                                                        speedExpanded = false 
-                                                    })
                                                 }
                                             }
                                         }
 
-                                        IconButton(onClick = { 
-                                            SettingsManager.volumeBoost = if (SettingsManager.volumeBoost > 1.0f) 1.0f else 1.5f
-                                            SettingsManager.save()
-                                            BeatDetector.syncPlaybackSettings()
-                                        }) { 
-                                            Icon(Icons.Default.VolumeUp, "Boost", tint = if (SettingsManager.volumeBoost > 1.0f) MaterialTheme.colorScheme.primary else Color.Gray) 
+                                        "Controls1" -> Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceEvenly,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            IconButton(onClick = { vm.skipBackward(30) }) {
+                                                Icon(
+                                                    Icons.Default.Replay30,
+                                                    "Skip -30s"
+                                                )
+                                            }
+                                            IconButton(onClick = { vm.skipBackward(5) }) {
+                                                Icon(
+                                                    Icons.Default.Replay5,
+                                                    "Skip -5s"
+                                                )
+                                            }
+                                            if (playerState.isPlaying) {
+                                                IconButton(onClick = { vm.pause() }) {
+                                                    Icon(
+                                                        Icons.Default.PauseCircle,
+                                                        "Pause",
+                                                        Modifier.size(48.dp),
+                                                        tint = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                            } else {
+                                                IconButton(onClick = { vm.play(context) }) {
+                                                    Icon(
+                                                        Icons.Default.PlayCircle,
+                                                        "Play",
+                                                        Modifier.size(48.dp),
+                                                        tint = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                            }
+                                            IconButton(onClick = { vm.skipForward(5) }) {
+                                                Icon(
+                                                    Icons.Default.Forward5,
+                                                    "Skip +5s"
+                                                )
+                                            }
+                                            IconButton(onClick = { vm.skipForward(30) }) {
+                                                Icon(
+                                                    Icons.Default.Forward30,
+                                                    "Skip +30s"
+                                                )
+                                            }
                                         }
-                                        IconButton(onClick = { vm.nextTrack(context) }) { Icon(Icons.Default.SkipNext, "Next") }
-                                    }
-                                    "Controls3" -> Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.VolumeUp, "Volume", modifier = Modifier.padding(end = 8.dp), tint = Color.Gray)
-                                            SliderWithTick(
-                                                value = playerState.mediaVolume,
-                                                onValueChange = {
-                                                    BeatDetector.updateMediaVolume(it)
-                                                },
-                                                valueRange = 0f..1f,
-                                                defaultValue = 0.9f,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            Text(
-                                                text = "${(playerState.mediaVolume * 100).toInt()}%",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                modifier = Modifier.width(40.dp)
-                                            )
+
+                                        "Controls2" -> Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceEvenly,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            IconButton(onClick = { vm.previousTrack(context) }) {
+                                                Icon(
+                                                    Icons.Default.SkipPrevious,
+                                                    "Prev"
+                                                )
+                                            }
+                                            IconButton(onClick = {
+                                                val toastText =
+                                                    if (!SettingsManager.isRepeatEnabled && !SettingsManager.isRepeatAllEnabled) {
+                                                        SettingsManager.isRepeatAllEnabled = true
+                                                        "Repeat All Enabled"
+                                                    } else if (SettingsManager.isRepeatAllEnabled) {
+                                                        SettingsManager.isRepeatAllEnabled = false
+                                                        SettingsManager.isRepeatEnabled = true
+                                                        "Repeat One Enabled"
+                                                    } else {
+                                                        SettingsManager.isRepeatEnabled = false
+                                                        SettingsManager.isRepeatAllEnabled = false
+                                                        "Repeat Disabled"
+                                                    }
+                                                Toast.makeText(
+                                                    context,
+                                                    toastText,
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                                SettingsManager.save()
+                                            }) {
+                                                val icon =
+                                                    if (SettingsManager.isRepeatEnabled) Icons.Default.RepeatOne else Icons.Default.Repeat
+                                                val tint =
+                                                    if (SettingsManager.isRepeatEnabled || SettingsManager.isRepeatAllEnabled) MaterialTheme.colorScheme.primary else Color.Gray
+                                                Icon(icon, "Repeat", tint = tint)
+                                            }
+
+                                            var speedExpanded by remember { mutableStateOf(false) }
+                                            Box {
+                                                TextButton(onClick = { speedExpanded = true }) {
+                                                    Text(
+                                                        "${SettingsManager.playbackSpeed}x",
+                                                        fontSize = 12.sp
+                                                    )
+                                                }
+                                                DropdownMenu(
+                                                    expanded = speedExpanded,
+                                                    onDismissRequest = { speedExpanded = false }) {
+                                                    listOf(
+                                                        0.5f,
+                                                        0.75f,
+                                                        1.0f,
+                                                        1.25f,
+                                                        1.5f,
+                                                        2.0f
+                                                    ).forEach { speed ->
+                                                        DropdownMenuItem(
+                                                            text = { Text("${speed}x") },
+                                                            onClick = {
+                                                                SettingsManager.playbackSpeed =
+                                                                    speed
+                                                                SettingsManager.save()
+                                                                BeatDetector.syncPlaybackSettings()
+                                                                speedExpanded = false
+                                                            })
+                                                    }
+                                                }
+                                            }
+
+                                            IconButton(onClick = {
+                                                SettingsManager.volumeBoost =
+                                                    if (SettingsManager.volumeBoost > 1.0f) 1.0f else 1.5f
+                                                SettingsManager.save()
+                                                BeatDetector.syncPlaybackSettings()
+                                            }) {
+                                                Icon(
+                                                    Icons.AutoMirrored.Filled.VolumeUp,
+                                                    "Boost",
+                                                    tint = if (SettingsManager.volumeBoost > 1.0f) MaterialTheme.colorScheme.primary else Color.Gray
+                                                )
+                                            }
+                                            IconButton(onClick = { vm.nextTrack(context) }) {
+                                                Icon(
+                                                    Icons.Default.SkipNext,
+                                                    "Next"
+                                                )
+                                            }
                                         }
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.Vibration, "Intensity", modifier = Modifier.padding(end = 8.dp), tint = Color.Gray)
-                                            SliderWithTick(
-                                                value = playerState.masterIntensity,
-                                                onValueChange = { BeatDetector.updateMasterIntensity(it) },
-                                                valueRange = 0f..1f,
-                                                defaultValue = 0.9f,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            Text(
-                                                text = "${(playerState.masterIntensity * 100).toInt()}%",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                modifier = Modifier.width(40.dp)
-                                            )
-                                        }
+
+                                        "Controls3" -> Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 8.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    Icons.AutoMirrored.Filled.VolumeUp,
+                                                    "Volume",
+                                                    modifier = Modifier.padding(end = 8.dp),
+                                                    tint = Color.Gray
+                                                )
+                                                SliderWithTick(
+                                                    value = playerState.mediaVolume,
+                                                    onValueChange = {
+                                                        BeatDetector.updateMediaVolume(it)
+                                                    },
+                                                    valueRange = 0f..1f,
+                                                    defaultValue = 0.9f,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                Text(
+                                                    text = "${(playerState.mediaVolume * 100).toInt()}%",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    modifier = Modifier.width(40.dp)
+                                                )
+                                            }
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    Icons.Default.Vibration,
+                                                    "Intensity",
+                                                    modifier = Modifier.padding(end = 8.dp),
+                                                    tint = Color.Gray
+                                                )
+                                                SliderWithTick(
+                                                    value = playerState.masterIntensity,
+                                                    onValueChange = {
+                                                        BeatDetector.updateMasterIntensity(
+                                                            it
+                                                        )
+                                                    },
+                                                    valueRange = 0f..1f,
+                                                    defaultValue = 0.9f,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                Text(
+                                                    text = "${(playerState.masterIntensity * 100).toInt()}%",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    modifier = Modifier.width(40.dp)
+                                                )
+                                            }
                                     }
                                 }
                             }
                          }
                          Spacer(Modifier.height(12.dp))
+                        }
                     }
                 }
             }

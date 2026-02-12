@@ -40,7 +40,8 @@
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:src="@drawable/phone_left_on"
-            android:layout_marginEnd="6dp" />
+            android:layout_marginEnd="6dp"
+            android:contentDescription="Phone left haptic indicator" />
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -51,12 +52,14 @@
                 android:id="@+id/img_controller_left_top"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:src="@drawable/controller_left_on" />
+                android:src="@drawable/controller_left_on"
+                android:contentDescription="Left controller top haptic indicator" />
             <ImageView
                 android:id="@+id/img_controller_left_bottom"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:src="@drawable/controller_left_on" />
+                android:src="@drawable/controller_left_on"
+                android:contentDescription="Left controller bottom haptic indicator" />
         </LinearLayout>
 
         <!-- Audio Visualizer Area -->
@@ -124,7 +127,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="2dp"
                     android:layout_centerInParent="true"
-                    android:background="#2196F3" />
+                    android:background="#2196F3"
+                    android:contentDescription="Waveform visualizer" />
             </RelativeLayout>
         </FrameLayout>
 
@@ -137,12 +141,14 @@
                 android:id="@+id/img_controller_right_top"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:src="@drawable/controller_right_on" />
+                android:src="@drawable/controller_right_on"
+                android:contentDescription="Right controller top haptic indicator" />
             <ImageView
                 android:id="@+id/img_controller_right_bottom"
                 android:layout_width="20dp"
                 android:layout_height="20dp"
-                android:src="@drawable/controller_right_on" />
+                android:src="@drawable/controller_right_on"
+                android:contentDescription="Right controller bottom haptic indicator" />
         </LinearLayout>
 
         <ImageView
@@ -150,7 +156,8 @@
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:src="@drawable/phone_right_on"
-            android:layout_marginStart="6dp" />
+            android:layout_marginStart="6dp"
+            android:contentDescription="Phone right haptic indicator" />
     </LinearLayout>
 
     <!-- BBPlayer Controls -->
@@ -182,7 +189,8 @@
                 android:layout_height="32dp"
                 android:src="@android:drawable/ic_media_rew"
                 android:padding="4dp"
-                android:layout_marginEnd="6dp" />
+                android:layout_marginEnd="6dp"
+                android:contentDescription="Replay 30 seconds" />
 
             <ImageView
                 android:id="@+id/btn_replay_5"
@@ -190,21 +198,24 @@
                 android:layout_height="32dp"
                 android:src="@android:drawable/ic_media_previous"
                 android:padding="4dp"
-                android:layout_marginEnd="10dp" />
+                android:layout_marginEnd="10dp"
+                android:contentDescription="Replay 5 seconds" />
 
             <ImageView
                 android:id="@+id/btn_play_pause"
                 android:layout_width="36dp"
                 android:layout_height="36dp"
                 android:src="@android:drawable/ic_media_play"
-                android:padding="4dp" />
+                android:padding="4dp"
+                android:contentDescription="Play or Pause" />
 
             <ImageView
                 android:id="@+id/btn_stop"
                 android:layout_width="36dp"
                 android:layout_height="36dp"
                 android:src="@android:drawable/ic_menu_close_clear_cancel"
-                android:padding="4dp" />
+                android:padding="4dp"
+                android:contentDescription="Stop" />
 
             <ImageView
                 android:id="@+id/btn_forward_5"
@@ -212,7 +223,8 @@
                 android:layout_height="32dp"
                 android:src="@android:drawable/ic_media_next"
                 android:padding="4dp"
-                android:layout_marginStart="10dp" />
+                android:layout_marginStart="10dp"
+                android:contentDescription="Forward 5 seconds" />
 
             <ImageView
                 android:id="@+id/btn_forward_30"
@@ -220,7 +232,8 @@
                 android:layout_height="32dp"
                 android:src="@android:drawable/ic_media_ff"
                 android:padding="4dp"
-                android:layout_marginStart="6dp" />
+                android:layout_marginStart="6dp"
+                android:contentDescription="Forward 30 seconds" />
 
         </LinearLayout>
     </LinearLayout>

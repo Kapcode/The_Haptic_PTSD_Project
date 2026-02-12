@@ -4,9 +4,14 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.ui.graphics.Color
 import androidx.core.content.ContextCompat
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * Singleton object for managing haptic feedback and visualizer state.
@@ -55,7 +60,7 @@ data class HapticState(
     val activeProfiles: Set<BeatProfile> = emptySet(),
 
     // Live visualizer data
-    val visualizerData: FloatArray = FloatArray(32) { 0f },
+    val visualizerData: FloatArray = FloatArray(32),
     val resetCounter: Int = 0,
     val pauseStartTime: Long = 0
 )
@@ -208,7 +213,7 @@ object HapticManager {
             _state.value = _state.value.copy(isTestRunning = true, testPulseCount = 0)
             repeat(3) { i ->
                 _state.value = _state.value.copy(testPulseCount = i + 1)
-                playHeartbeatPulse()
+                playPattern(HapticPatterns.TestPulse)
                 val interval = 60000L / _state.value.bpm
                 delay(interval)
             }
@@ -274,24 +279,31 @@ object HapticManager {
     }
 
     private suspend fun playHeartbeatPulse() {
+        playPattern(HapticPatterns.Heartbeat, profile = BeatProfile.AMPLITUDE)
+    }
+
+    private suspend fun playPattern(
+        pattern: HapticPattern,
+        intensityMultiplier: Float = 1.0f,
+        profile: BeatProfile? = null
+    ) {
         val s = _state.value
-        val intensity = s.intensity
-        val strength1 = (255 * intensity).toInt().coerceIn(1, 255)
-        val strength2 = (180 * intensity).toInt().coerceIn(1, 255)
+        val baseIntensity = s.intensity * intensityMultiplier
 
-        updateVisuals(intensity, 2, BeatProfile.AMPLITUDE)
-        delay(s.leadInMs.toLong())
-        playRawVibration(50, strength1)
-        delay(50)
-        delay(s.leadOutMs.toLong())
-        
-        delay(80)
+        for (step in pattern.steps) {
+            if (step.delayMs > 0) {
+                delay(step.delayMs)
+            }
 
-        updateVisuals(intensity * 0.7f, 2, BeatProfile.AMPLITUDE)
-        delay(s.leadInMs.toLong())
-        playRawVibration(60, strength2)
-        delay(60)
-        delay(s.leadOutMs.toLong())
+            val stepIntensity = (step.amplitude / 255f) * baseIntensity
+            val strength = (step.amplitude * baseIntensity).toInt().coerceIn(1, 255)
+
+            updateVisuals(stepIntensity, 2, profile)
+            delay(s.leadInMs.toLong())
+            playRawVibration(step.durationMs, strength)
+            delay(step.durationMs)
+            delay(s.leadOutMs.toLong())
+        }
     }
     
     fun updateControllerVisuals(leftTop: Float = 0f, leftBottom: Float = 0f, rightTop: Float = 0f, rightBottom: Float = 0f) {
@@ -317,7 +329,7 @@ object HapticManager {
             controllerLeftBottomIntensity = 0f,
             controllerRightTopIntensity = 0f,
             controllerRightBottomIntensity = 0f,
-            visualizerData = FloatArray(32) { 0f },
+            visualizerData = FloatArray(32),
             activeProfiles = emptySet(),
             resetCounter = current.resetCounter + 1
         )

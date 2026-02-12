@@ -13,18 +13,31 @@ The application aims to provide physiological regulation through:
 ## Key Features
 
 ### Active Heartbeat (Squeeze & Snap)
-A primary therapeutic feature where the user activates a comforting, rhythmic "heartbeat" vibration by squeezing their phone or using a sharp wrist movement. This mimics the calming effect of human touch or pulse-syncing, helping to break cycles of panic or distress even when lying in bed.
+
+A primary therapeutic feature where the user activates a comforting, rhythmic "heartbeat" vibration
+by squeezing their phone or using a sharp wrist movement. This mimics the calming effect of human
+touch or pulse-syncing, helping to break cycles of panic or distress even when lying in bed. Now
+supports extensible haptic patterns for more personalized feedback.
 
 ### Bilateral Beat Player
 Analyze any audio file from your library to generate a custom haptic profile. The app uses advanced signal processing to "feel" the music, providing synchronized tactile feedback that matches the intensity and duration of detected transients.
 - **Advanced Controls**: Full playback control including Repeat (One/All), Next/Previous track, Playback Speed (0.5x to 2.0x), and a 1.5x Volume Boost.
 - **Live Profile Switching**: Switch between Bass, Drum, Guitar, and Amplitude profiles seamlessly during playback. The haptics update instantly to match the new profile.
+- **Animated Interface**: Reordering of the tool portions is now animated for a more fluid, "
+  fidget-like" experience.
 
-### Accessibility & Tactile Feedback
-The app is designed to be inclusive and responsive to user needs:
-- **Customizable Typography**: Adjust Heading, Regular, Title, Button, and Notation font sizes independently via a dedicated Accessibility card. Minimum bounds are enforced to ensure legibility.
-- **Application Haptic Signatures**: Every interaction—snapping a slider, toggling a switch, or clicking a button—now has a distinct tactile signature, providing immediate physical confirmation of your actions.
-- **Emergency Recovery**: The "Hold to Reset" button maintains a fixed, legible size regardless of other font adjustments, ensuring you can always restore your environment.
+### Accessibility & Interface Design
+
+The app is designed to be inclusive, responsive, and tactilely rich:
+
+- **Collapsible Settings Cards**: All settings sections are now collapsible via `SectionCard`, with
+  primary therapeutic cards expanded by default for quick access.
+- **Centralized Animations**: A dedicated animation framework ensures consistent, smooth transitions
+  and effects across the application.
+- **Customizable Typography**: Adjust Heading, Regular, Title, Button, and Notation font sizes
+  independently via a dedicated Accessibility card.
+- **Application Haptic Signatures**: Every interaction—snapping a slider, toggling a switch, or
+  clicking a button—has a distinct tactile signature.
 
 ### Multi-Layer Audio Visualizer
 A high-resolution, 32-band frequency visualizer available in-app and via persistent notification. It supports independent, overlapping layers that can be toggled in settings.
@@ -35,7 +48,9 @@ Built for the most sensitive contexts, all detection and analysis happen locally
 ---
 
 ## Tech Stack
-- **UI:** Jetpack Compose (Material 3) with real-time dynamic theming.
+
+- **UI:** Jetpack Compose (Material 3) with real-time dynamic theming and centralized animation
+  definitions.
 - **Logic:** Kotlin / Coroutines / Channel-based Task Queueing.
 - **Sensing:** Acoustic Pressure Detection (sonar-based) & Linear Acceleration.
 - **Background:** Android Foreground Service with WakeLock and persistent status notifications.

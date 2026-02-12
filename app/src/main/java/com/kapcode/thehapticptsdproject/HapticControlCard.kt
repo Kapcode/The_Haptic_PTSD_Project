@@ -22,7 +22,7 @@ import java.util.Locale
 @Composable
 fun HapticControlCard(vm: HapticControlViewModel = viewModel()) {
     val state by vm.hapticState.collectAsState()
-    SectionCard(title = "Active Heartbeat Settings") {
+    SectionCard(title = "Active Heartbeat Settings", isInitiallyExpanded = true) {
         Column {
             Text("Intensity: ${(state.intensity * 100).toInt()}%")
             SliderWithTick(

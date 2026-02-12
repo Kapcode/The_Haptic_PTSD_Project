@@ -23,21 +23,35 @@ This document contains technical details, architectural decisions, and developme
 
 ### Haptic Feedback Engine (`HapticManager.kt`)
 - **Architecture**: Singleton `object` coordinating feedback across Phone and External Controllers.
+- **Haptic Pattern System**: Extensible haptic sequences defined in `HapticPatterns.kt`. Uses
+  `VibrationStep` to define duration, amplitude, and delay, allowing for complex, multi-stage
+  vibrations like the "Heartbeat".
 - **Application Haptics**: Dedicated tactile signatures for UI interactions (snapping, toggling, clicking) defined in `ApplicationHapticEffects.kt`.
 - **Multi-Assignment**: Supports routing multiple `BeatProfile` transients to any combination of the 6 available haptic points.
 - **Live Visualizer State**: Tracks independent colors and intensities for each motor based on the most recent trigger.
 
 ## UI & Accessibility
 
+### Animation Framework (`Animations.kt`)
+
+- **Centralization**: All common animation specs (e.g., `bouncyAnimationSpec`) and reusable
+  animation composables (e.g., `animateWobble`) are centralized.
+- **Dynamic Feedback**: UI components use these centralized definitions to provide consistent visual
+  feedback for haptic events and interactions.
+
+### Component Design
+
+- **Collapsible Cards**: The `SectionCard` component (`HelperComposables.kt`) now supports optional
+  collapsibility. Primary therapeutic cards are expanded by default, while settings are collapsed to
+  reduce visual clutter.
+- **Animated Reordering**: The Bilateral Beat Player uses `LazyColumn` with `animateItemPlacement`
+  to provide a fluid, "fidget-like" experience when reordering its control components.
+
 ### Dynamic Typography
 - **Customization**: Independent sliders for Heading, Regular, Card Title, Button, and Notation font sizes.
 - **Mapping**: Settings are mapped directly to Material 3 typography styles (`titleLarge`, `bodyMedium`, `labelLarge`, etc.).
-- **Safety**: Minimum font size bounds are enforced in `SettingsManager` to prevent unreadable UI states. The "Hold to Reset" button uses a fixed size for emergency recovery.
-
-### Settings & Experimental Features
-- **Organization**: Centralized settings in a `ModalNavigationDrawer`.
-- **Sandboxing**: Development-stage features (like Squeeze Detection) are hidden unless the "Experimental Features" switch is enabled in the drawer.
-- **ViewModels**: Features like Experimental Settings are managed via dedicated ViewModels to decouple UI state from global managers.
+- **Safety**: Minimum font size bounds are enforced in `SettingsManager` to prevent unreadable UI
+  states.
 
 ## Bilateral Beat Player & Stimulation
 
@@ -49,3 +63,9 @@ This document contains technical details, architectural decisions, and developme
 ## Current Known Issues / Notes
 - **Foreground Service**: Requires `FOREGROUND_SERVICE_SPECIAL_USE` and `POST_NOTIFICATIONS` permissions.
 - **WakeLock**: Prevents system sleep during active therapeutic sessions.
+- **FIXED**: BBPlayer card controls would disappear after a "Reset to Defaults" action.
+    - **Cause**: `BeatDetector.resetPlayer()` was clearing the `selectedFileUri`, which is required
+      for the controls to be visible.
+    - **Solution**: Modified `resetPlayer()` to preserve the `selectedFileUri` and
+      `selectedFileName` while resetting all other playback-related states. This ensures the UI
+      remains intact after a reset.
